@@ -60,7 +60,7 @@ def cfg():
 
     elif mode == 'test':
         notrain = False
-        snapshot = './runs/PANet_VOC_align_sets_0_1way_1shot_[train]/1/snapshots/30000.pth'
+        snapshot = './runs/PANet_VOC_align_sets_0_1way_1shot_[train]/5/snapshots/30000.pth'
         n_runs = 5
         n_steps = 1000
         batch_size = 1
