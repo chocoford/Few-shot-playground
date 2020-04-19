@@ -28,13 +28,13 @@ def cfg():
     seed = 1234
     cuda_visable = '0, 1, 2, 3, 4, 5, 6, 7'
     gpu_id = 0
-    mode = 'test' # 'train' or 'test'
+    mode = 'train' # 'train' or 'test'
 
 
     if mode == 'train':
         dataset = 'VOC'  # 'VOC' or 'COCO'
         n_steps = 30000
-        label_sets = 0
+        label_sets = 1
         batch_size = 1
         lr_milestones = [10000, 20000, 30000]
         align_loss_scaler = 1
@@ -82,7 +82,7 @@ def cfg():
             model[key] = key in snapshot
 
         # Set label_sets from the snapshot string
-        label_sets = int(snapshot.split('_sets_')[1][0])
+        label_sets = int(snapshot.split('_sets_')[1][0]) #0
 
         # Set task config from the snapshot string
         task = {

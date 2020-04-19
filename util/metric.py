@@ -102,7 +102,7 @@ class Metric(object):
 
             # Compute mean IoU classwisely and average over classes
             mIoU_class = tp_sum / (tp_sum + fp_sum + fn_sum)
-            mIoU = mIoU_class.mean()
+            mIoU = mIoU_class.mean() 
 
             return mIoU_class, mIoU
 
