@@ -74,6 +74,10 @@ class BaseDataset(Dataset):
                 a sequence of sequences, each sequence contains data ids for one subset
             sub_args_lst:
                 a list of args for some subset-specific auxiliary attribute function
+
+        Returns
+        -------------
+            subsets: a list of n of Subset
         """
 
         indices = [[self.ids.index(id_) for id_ in ids] for ids in sub_ids]
