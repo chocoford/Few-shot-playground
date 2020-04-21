@@ -1,5 +1,6 @@
 import numpy as np
 import os
+import matplotlib
 
 class Visualizer():
     """
@@ -66,8 +67,7 @@ class Visualizer():
             img: 
 
         """
-        np.save(f'{name}.npy', img.cpu().numpy())
-
+        matplotlib.image.imsave('f{self.imgDir}/{name}.png', img.cpu().numpy())
 
 
     # def mkdir(path):
