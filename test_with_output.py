@@ -92,6 +92,7 @@ def main(_run, _config, _log):
                 label_ids = [coco_cls_ids.index(x) + 1 for x in sample_batched['class_ids']]
             else:
                 label_ids = list(sample_batched['class_ids'])
+            _log,info(f'label_ids: {label_ids}')
             support_images = [[shot.cuda() for shot in way]
                               for way in sample_batched['support_images']]
             suffix = 'scribble' if _config['scribble'] else 'mask'
@@ -122,7 +123,7 @@ def main(_run, _config, _log):
 
             query_pred, _ = model(support_images, support_fg_mask, support_bg_mask,
                                   query_images)
-            _log.info(f'query_labels: {query_labels[0]}')
+            # _log.info(f'query_labels: {query_labels[0]}')
                 
 
     #             metric.record(np.array(query_pred.argmax(dim=1)[0].cpu()),
