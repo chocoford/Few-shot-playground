@@ -59,6 +59,10 @@ def main(_run, _config, _log):
         transforms.append(DilateScribble(size=_config['scribble_dilation']))
     transforms = Compose(transforms)
 
+    #创建文件夹
+    for label in labels:
+        os.makedirs(f"./results/{label}", exist_ok=True)
+
 
     _log.info('###### Testing begins ######')
     metric = Metric(max_label=max_label, n_runs=_config['n_runs'])
