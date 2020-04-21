@@ -72,7 +72,7 @@ class Visualizer():
         imgs = imgs.cpu()
         for i in range(imgs.shape[0]):
             print(imgs[i].shape)
-            matplotlib.image.imsave(f'{self.imgDir}/{name}_{i}.png', imgs[i].numpy().transpose((1,2,0)))
+            matplotlib.image.imsave(f'{self.imgDir}/{name}_{i}.png', imgs[i].numpy().transpose((1,2,0)) / 255.0)
 
 
     # def mkdir(path):
