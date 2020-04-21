@@ -75,7 +75,7 @@ def main(_run, _config, _log):
             transforms=transforms,
             to_tensor=ToTensorNormalize(),
             labels=labels,
-            max_iters=_config['n_steps'] * _config['batch_size'],
+            max_iters=10,#_config['n_steps'] * _config['batch_size'],
             n_ways=_config['task']['n_ways'],
             n_shots=_config['task']['n_shots'],
             n_queries=_config['task']['n_queries']
