@@ -75,7 +75,7 @@ def main(_run, _config, _log):
             transforms=transforms,
             to_tensor=ToTensorNormalize(),
             labels=labels,
-            max_iters=10,
+            max_iters=_config['n_steps'] * _config['batch_size'],
             n_ways=_config['task']['n_ways'],
             n_shots=_config['task']['n_shots'],
             n_queries=_config['task']['n_queries']
@@ -122,7 +122,7 @@ def main(_run, _config, _log):
 
             query_pred, _ = model(support_images, support_fg_mask, support_bg_mask,
                                   query_images)
-            _log.info(f'query_pred: {query_pred.shape}')
+            _log.info(f'query_labels: {query_labels[0]}')
                 
 
     #             metric.record(np.array(query_pred.argmax(dim=1)[0].cpu()),
