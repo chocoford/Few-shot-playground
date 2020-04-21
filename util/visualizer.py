@@ -67,7 +67,7 @@ class Visualizer():
             img: 
 
         """
-        matplotlib.image.imsave('f{self.imgDir}/{name}.png', img.cpu().numpy())
+        matplotlib.image.imsave(f'{self.imgDir}/{name}.png', img.cpu().numpy())
 
 
     # def mkdir(path):
