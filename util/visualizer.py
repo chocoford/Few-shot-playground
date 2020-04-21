@@ -66,7 +66,7 @@ class Visualizer():
             img: 
 
         """
-        np.save(f'{name}.npy', img.numpy())
+        np.save(f'{name}.npy', img.cpu().numpy())
 
 
 
