@@ -16,6 +16,7 @@ from dataloaders.customized import voc_fewshot, coco_fewshot
 from dataloaders.transforms import ToTensorNormalize
 from dataloaders.transforms import Resize, DilateScribble
 from util.metric import Metric
+from util.visualizer import Visualizer
 from util.utils import set_seed, CLASS_LABELS, get_bbox
 from config import ex
 
@@ -27,6 +28,7 @@ def main(_run, _config, _log):
     #                 exist_ok=True)
     #     _run.observers[0].save_file(source_file, f'source/{source_file}')
     # shutil.rmtree(f'{_run.observers[0].basedir}/_sources')
+
 
     set_seed(_config['seed'])
     cudnn.enabled = True
@@ -60,12 +62,14 @@ def main(_run, _config, _log):
     transforms = Compose(transforms)
 
     #创建文件夹
+    os.makedirs("./results/img", exist_ok=True)
     for label in labels:
         os.makedirs(f"./results/{label}", exist_ok=True)
 
 
     _log.info('###### Testing begins ######')
     metric = Metric(max_label=max_label, n_runs=_config['n_runs'])
+    visualizer = Visualizer()
     with torch.no_grad():
         # for run in range(_config['n_runs']):
         run = 0
@@ -91,7 +95,7 @@ def main(_run, _config, _log):
         _log.info(f"Total # of Data: {len(dataset)}")
 
 
-        for sample_batched in tqdm.tqdm(testloader):
+        for i, sample_batched in enumerate(tqdm.tqdm(testloader)):
             if _config['dataset'] == 'COCO':
                 label_ids = [coco_cls_ids.index(x) + 1 for x in sample_batched['class_ids']]
             else:
@@ -128,6 +132,7 @@ def main(_run, _config, _log):
             query_pred, _ = model(support_images, support_fg_mask, support_bg_mask,
                                   query_images)
             # _log.info(f'query_labels: {query_labels[0]}')
+            visualizer.saveImg(query_images, str(i))
                 
 
     #             metric.record(np.array(query_pred.argmax(dim=1)[0].cpu()),
