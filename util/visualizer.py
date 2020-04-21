@@ -8,7 +8,7 @@ class Visualizer():
     """
 
     def __init__(self):
-        self.rootDir = "../results"
+        self.rootDir = "./results"
         self.imgDir = os.path.join(self.rootDir, "img")
         self.i = 0
 
