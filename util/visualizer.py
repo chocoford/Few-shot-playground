@@ -58,18 +58,20 @@ class Visualizer():
             np.save(f'{dirName}/', query_image.numpy())
 
 
-    def saveImg(self, img, name):
+    def saveImgs(self, imgs, name):
         """
         save query image
 
         Parameters
         -----------
-            img: 
+            imgs: 
 
         """
-        print(img.cpu().numpy())
-        print(img.cpu().shape)
-        # matplotlib.image.imsave(f'{self.imgDir}/{name}.png', img.cpu().numpy())
+        print(imgs.cpu().numpy())
+        print(imgs.cpu().shape)
+        imgs = imgs.cpu()
+        for i in range(imgs.shape[0]):
+            matplotlib.image.imsave(f'{self.imgDir}/{name}_{i}.png', imgs[i].numpy())
 
 
     # def mkdir(path):
