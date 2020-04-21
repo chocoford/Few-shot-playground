@@ -131,8 +131,8 @@ def main(_run, _config, _log):
 
             query_pred, _ = model(support_images, support_fg_mask, support_bg_mask,
                                   query_images)
-            # _log.info(f'query_labels: {query_labels[0]}')
-            visualizer.saveImg(query_images, str(i))
+            _log.info(f'len of query_images: {len(query_images)}')
+            visualizer.saveImg(query_images[0], str(i))
                 
 
     #             metric.record(np.array(query_pred.argmax(dim=1)[0].cpu()),
