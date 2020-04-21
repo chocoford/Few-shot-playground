@@ -67,10 +67,11 @@ class Visualizer():
             imgs: 
 
         """
-        print(imgs.cpu().numpy())
-        print(imgs.cpu().shape)
+        # print(imgs.cpu().numpy())
+        # print(imgs.cpu().shape)
         imgs = imgs.cpu()
         for i in range(imgs.shape[0]):
+            print(imgs[i].numpy())
             matplotlib.image.imsave(f'{self.imgDir}/{name}_{i}.png', imgs[i].numpy())
 
 
