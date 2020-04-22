@@ -56,7 +56,7 @@ class Visualizer():
             # target_idx_j = set(zip(idx[0].tolist(), idx[1].tolist()))
 
         im_mask = Image.fromarray(np.uint8(pred_visual))
-        im_query = Image.fromarray(query_image.numpy().transpose(1, 2, 0))
+        im_query = Image.fromarray(query_image.cpu().numpy().transpose(1, 2, 0))
         im_blend = self.blend(im_query, im_mask)
         self.saveImgs(im_blend, name)
 
