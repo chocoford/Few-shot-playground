@@ -60,10 +60,13 @@ class Visualizer():
             gt_visual[idx[0], idx[1], :] = self.visualizeColor[j]
             # target_idx_j = set(zip(idx[0].tolist(), idx[1].tolist()))
 
-        im_mask = Image.fromarray(np.uint8(pred_visual))
+        pred_mask = Image.fromarray(np.uint8(pred_visual))
+        gt_mask = Image.fromarray(np.uint8(pred_visual))
+
         im_query = Image.fromarray(query_image.cpu().numpy().transpose(1, 2, 0))
-        pred_im_blend = self.blend(im_query, im_mask)
-        gt_im_blend = self.blend(im_query, im_mask)
+        
+        pred_im_blend = self.blend(im_query, pred_mask)
+        gt_im_blend = self.blend(im_query, gt_mask)
         self.saveImgs(f'{self.predImgDir}', pred_im_blend, name)
         self.saveImgs(f'{self.gtImgDir}', gt_im_blend, name)
 
