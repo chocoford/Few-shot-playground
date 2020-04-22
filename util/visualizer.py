@@ -32,7 +32,7 @@ class Visualizer():
         # 获得预测mask即每一个像素最可能的类，[H, W]
         pred = np.array(query_pred.argmax(dim=1)[0].cpu()) 
         img_size = pred.shape[-2:]
-        print(img_size)
+        # print(img_size)
         assert pred.shape == target.shape
 
         pred_visual = np.zeros((img_size[0], img_size[1], 3))
@@ -55,7 +55,7 @@ class Visualizer():
             # idx = np.where(target == j)
             # target_idx_j = set(zip(idx[0].tolist(), idx[1].tolist()))
 
-        im_mask = Image.fromarray(pred_visual)
+        im_mask = Image.fromarray(np.uint8(pred_visual))
         im_query = Image.fromarray(query_image.numpy().transpose(1, 2, 0))
         im_blend = self.blend(im_query, im_mask)
         self.saveImgs(im_blend, name)
