@@ -13,13 +13,14 @@ class Visualizer():
         self.i = 0
 
 
-    def record(self, query_image, query_pred, target, labels=None, n_run=None):
+    def visualize(self, query_images, query_pred, target, name, labels=None, n_run=None):
         """
-        Record the evaluation result for each sample and each class label, including:
-            True Positive, False Positive, False Negative
+        通过blend原图和mask从而可视化结果。
 
         Args
         ----------
+            query_images: expect shape [B x 3 x H x W]
+
             query_pred:
                 predicted mask array, expected shape is 1 x (1+way) x H x W
 
@@ -30,16 +31,17 @@ class Visualizer():
         """
         # 获得预测mask即每一个像素最可能的类，[H, W]
         pred = np.array(query_pred.argmax(dim=1)[0].cpu()) 
-
+        img_size = pred.shape[-2:]
         assert pred.shape == target.shape
+
+        pred_visual = np.zeros(img_size[0], img_size[1], 3)
+
+        color = [np.array([254, 67, 101]), np.array([30, 41, 61])]
+
+        query_image = query_images[0]
 
         if self.n_runs == 1:
             n_run = 0 
-
-        # array to save the TP/FP/FN statistic for each class (plus BG)
-        tp_arr = np.full(len(self.labels), np.nan)
-        fp_arr = np.full(len(self.labels), np.nan)
-        fn_arr = np.full(len(self.labels), np.nan)
 
         if labels is None:
             labels = self.labels
@@ -49,32 +51,31 @@ class Visualizer():
         for j, label in enumerate(labels):
             # Get the location of the pixels that are predicted as class j
             idx = np.where(np.logical_and(pred == j, target != 255))
-            pred_idx_j = set(zip(idx[0].tolist(), idx[1].tolist()))
-            # Get the location of the pixels that are class j in ground truth
-            idx = np.where(target == j)
-            target_idx_j = set(zip(idx[0].tolist(), idx[1].tolist()))
+            pred_visual[idx[0], idx[1], :] = color[j]
+            # pred_idx_j = set(zip(idx[0].tolist(), idx[1].tolist()))
+            # # Get the location of the pixels that are class j in ground truth
+            # idx = np.where(target == j)
+            # target_idx_j = set(zip(idx[0].tolist(), idx[1].tolist()))
 
-            dirName = f'{rootDir}/{label}'
-            np.save(f'{dirName}/', query_image.numpy())
+        im_mask = Image.fromarray(pred_visual)
+        im_query = Image.fromarray(query_image.numpy().transpose(1, 2, 0))
+        im_blend = self.blend(im_query, im_mask)
+        self.saveImgs(im_blend, name)
 
 
-    def saveImgs(self, imgs, name):
+    def blend(self, img1, img2):
+        return Image.blend(img1, img2, 0.618)
+
+    def saveImgs(self, im, name):
         """
-        save query image
+        save query image with mask
 
         Parameters
         -----------
             imgs: 
 
         """
-        # print(imgs.cpu().numpy())
-        # print(imgs.cpu().shape)
-        imgs = imgs.cpu()
-        for i in range(imgs.shape[0]):
-            print(imgs[i].numpy().shape)
-            img = imgs[i].numpy().transpose(1, 2, 0)
-            im = Image.fromarray(img)
-            im.save(f'{self.imgDir}/{name}_{i}.png')
+        im.save(f'{self.imgDir}/{name}.png')
 
 
     # def mkdir(path):

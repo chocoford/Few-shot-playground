@@ -136,7 +136,7 @@ def main(_run, _config, _log):
                             for query_image_t in sample_batched['query_images_t']]
             # _log.info(f'shape of query_images_t: {query_images_t[0].shape}')
 
-            visualizer.saveImgs(query_images_t[0], str(i))
+            visualizer.visualize(query_images_t[0], query_pred, np.array(query_labels[0].cpu()), str(i), labels=label_ids)
                 
 
     #             metric.record(np.array(query_pred.argmax(dim=1)[0].cpu()),
