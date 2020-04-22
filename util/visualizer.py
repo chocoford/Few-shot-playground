@@ -72,7 +72,7 @@ class Visualizer():
         imgs = imgs.cpu()
         for i in range(imgs.shape[0]):
             print(imgs[i].numpy().shape)
-            img = imgs[i].numpy().transpose(2, 0, 1)
+            img = imgs[i].numpy().transpose(1, 2, 0)
             im = Image.fromarray(img)
             im.save(f'{self.imgDir}/{name}_{i}.jepg')
 
