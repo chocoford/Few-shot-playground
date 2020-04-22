@@ -58,11 +58,11 @@ class Visualizer():
         im_mask = Image.fromarray(np.uint8(pred_visual))
         im_query = Image.fromarray(query_image.cpu().numpy().transpose(1, 2, 0))
         im_blend = self.blend(im_query, im_mask)
-        self.saveImgs(im_mask, name)
+        self.saveImgs(im_blend, name)
 
 
-    def blend(self, img1, img2):
-        return Image.blend(img1, img2, 0.618)
+    def blend(self, img1, img2, alpha=0.382):
+        return Image.blend(img1, img2, alpha)
 
     def saveImgs(self, im, name):
         """
