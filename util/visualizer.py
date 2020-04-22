@@ -40,9 +40,6 @@ class Visualizer():
 
         query_image = query_images[0]
 
-        if self.n_runs == 1:
-            n_run = 0 
-
         if labels is None:
             labels = self.labels
         else:
