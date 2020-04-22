@@ -55,9 +55,9 @@ def main(_run, _config, _log):
     transforms = Compose(transforms)
 
     #创建文件夹
-    os.makedirs("./results/img", exist_ok=True)
-    for label in labels:
-        os.makedirs(f"./results/{label}", exist_ok=True)
+    # os.makedirs("./results", exist_ok=True)
+    # for label in labels:
+    #     os.makedirs(f"./results/{label}", exist_ok=True)
 
 
     _log.info('###### Testing begins ######')

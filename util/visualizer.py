@@ -9,8 +9,13 @@ class Visualizer():
 
     def __init__(self):
         self.rootDir = "./results"
-        self.imgDir = os.path.join(self.rootDir, "img")
+        self.predImgDir = os.path.join(self.rootDir, "pred")
+        self.gtImgDir = os.path.join(self.rootDir, "gt")
         self.i = 0
+        self.visualizeColor = [np.array([254, 67, 101]), np.array([30, 41, 61])]
+
+        os.makedirs(self.predImgDir, exist_ok=True)
+        os.makedirs(self.gtImgDir, exist_ok=True)
 
 
     def visualize(self, query_images, query_pred, target, name, labels=None, n_run=None):
@@ -36,8 +41,7 @@ class Visualizer():
         assert pred.shape == target.shape
 
         pred_visual = np.zeros((img_size[0], img_size[1], 3))
-
-        color = [np.array([254, 67, 101]), np.array([30, 41, 61])]
+        gt_visual = np.zeros((target.shape[0], target.shape[1], 3))
 
         query_image = query_images[0]
 
@@ -49,22 +53,24 @@ class Visualizer():
         for j, label in enumerate(labels):
             # Get the location of the pixels that are predicted as class j
             idx = np.where(np.logical_and(pred == j, target != 255))
-            pred_visual[idx[0], idx[1], :] = color[j]
+            pred_visual[idx[0], idx[1], :] = self.visualizeColor[j]
             # pred_idx_j = set(zip(idx[0].tolist(), idx[1].tolist()))
             # # Get the location of the pixels that are class j in ground truth
-            # idx = np.where(target == j)
+            idx = np.where(target == j)
+            gt_visual[idx[0], idx[1], :] = self.visualizeColor[j]
             # target_idx_j = set(zip(idx[0].tolist(), idx[1].tolist()))
 
         im_mask = Image.fromarray(np.uint8(pred_visual))
         im_query = Image.fromarray(query_image.cpu().numpy().transpose(1, 2, 0))
-        im_blend = self.blend(im_query, im_mask)
-        self.saveImgs(im_blend, name)
+        pred_im_blend = self.blend(im_query, im_mask)
+        gt_im_blend = self.blend(im_query, im_mask)
+        self.saveImgs(f'{self.predImgDir}', pred_im_blend, name)
+        self.saveImgs(f'{self.gtImgDir}', gt_im_blend, name)
 
-
-    def blend(self, img1, img2, alpha=0.382):
+    def blend(self, img1, img2, alpha=0.618):
         return Image.blend(img1, img2, alpha)
 
-    def saveImgs(self, im, name):
+    def saveImgs(self, path, im, name):
         """
         save query image with mask
 
@@ -73,7 +79,7 @@ class Visualizer():
             imgs: 
 
         """
-        im.save(f'{self.imgDir}/{name}.png')
+        im.save(f'{path}/{name}.png')
 
 
     # def mkdir(path):
