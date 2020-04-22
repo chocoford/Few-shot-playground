@@ -74,7 +74,7 @@ class Visualizer():
             print(imgs[i].numpy().shape)
             img = imgs[i].numpy().transpose(1, 2, 0)
             im = Image.fromarray(img)
-            im.save(f'{self.imgDir}/{name}_{i}.jepg')
+            im.save(f'{self.imgDir}/{name}_{i}.png')
 
 
     # def mkdir(path):
