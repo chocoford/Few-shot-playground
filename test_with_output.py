@@ -23,13 +23,6 @@ from config import ex
 
 @ex.automain
 def main(_run, _config, _log):
-    # for source_file, _ in _run.experiment_info['sources']:
-    #     os.makedirs(os.path.dirname(f'{_run.observers[0].dir}/source/{source_file}'),
-    #                 exist_ok=True)
-    #     _run.observers[0].save_file(source_file, f'source/{source_file}')
-    # shutil.rmtree(f'{_run.observers[0].basedir}/_sources')
-
-
     set_seed(_config['seed'])
     cudnn.enabled = True
     cudnn.benchmark = True
@@ -100,7 +93,6 @@ def main(_run, _config, _log):
                 label_ids = [coco_cls_ids.index(x) + 1 for x in sample_batched['class_ids']]
             else:
                 label_ids = list(sample_batched['class_ids'])
-            _log.info(f'label_ids: {label_ids}') 
             support_images = [[shot.cuda() for shot in way]
                               for way in sample_batched['support_images']]
             suffix = 'scribble' if _config['scribble'] else 'mask'
@@ -142,36 +134,3 @@ def main(_run, _config, _log):
     #             metric.record(np.array(query_pred.argmax(dim=1)[0].cpu()),
     #                           np.array(query_labels[0].cpu()),
     #                           labels=label_ids, n_run=run)
-
-    #         classIoU, meanIoU = metric.get_mIoU(labels=sorted(labels), n_run=run)
-    #         classIoU_binary, meanIoU_binary = metric.get_mIoU_binary(n_run=run)
-
-    #         _run.log_scalar('classIoU', classIoU.tolist())
-    #         _run.log_scalar('meanIoU', meanIoU.tolist())
-    #         _run.log_scalar('classIoU_binary', classIoU_binary.tolist())
-    #         _run.log_scalar('meanIoU_binary', meanIoU_binary.tolist())
-    #         _log.info(f'classIoU: {classIoU}')
-    #         _log.info(f'meanIoU: {meanIoU}')
-    #         _log.info(f'classIoU_binary: {classIoU_binary}')
-    #         _log.info(f'meanIoU_binary: {meanIoU_binary}')
-
-    # classIoU, classIoU_std, meanIoU, meanIoU_std = metric.get_mIoU(labels=sorted(labels))
-    # classIoU_binary, classIoU_std_binary, meanIoU_binary, meanIoU_std_binary = metric.get_mIoU_binary()
-
-    # _log.info('----- Final Result -----')
-    # _run.log_scalar('final_classIoU', classIoU.tolist())
-    # _run.log_scalar('final_classIoU_std', classIoU_std.tolist())
-    # _run.log_scalar('final_meanIoU', meanIoU.tolist())
-    # _run.log_scalar('final_meanIoU_std', meanIoU_std.tolist())
-    # _run.log_scalar('final_classIoU_binary', classIoU_binary.tolist())
-    # _run.log_scalar('final_classIoU_std_binary', classIoU_std_binary.tolist())
-    # _run.log_scalar('final_meanIoU_binary', meanIoU_binary.tolist())
-    # _run.log_scalar('final_meanIoU_std_binary', meanIoU_std_binary.tolist())
-    # _log.info(f'classIoU mean: {classIoU}')
-    # _log.info(f'classIoU std: {classIoU_std}')
-    # _log.info(f'meanIoU mean: {meanIoU}')
-    # _log.info(f'meanIoU std: {meanIoU_std}')
-    # _log.info(f'classIoU_binary mean: {classIoU_binary}')
-    # _log.info(f'classIoU_binary std: {classIoU_std_binary}')
-    # _log.info(f'meanIoU_binary mean: {meanIoU_binary}')
-    # _log.info(f'meanIoU_binary std: {meanIoU_std_binary}')
