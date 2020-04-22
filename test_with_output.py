@@ -54,12 +54,6 @@ def main(_run, _config, _log):
         transforms.append(DilateScribble(size=_config['scribble_dilation']))
     transforms = Compose(transforms)
 
-    #创建文件夹
-    # os.makedirs("./results", exist_ok=True)
-    # for label in labels:
-    #     os.makedirs(f"./results/{label}", exist_ok=True)
-
-
     _log.info('###### Testing begins ######')
     metric = Metric(max_label=max_label, n_runs=_config['n_runs'])
     visualizer = Visualizer()
@@ -76,7 +70,7 @@ def main(_run, _config, _log):
             transforms=transforms,
             to_tensor=ToTensorNormalize(),
             labels=labels,
-            max_iters=10,#_config['n_steps'] * _config['batch_size'],
+            max_iters=_config['n_steps'] * _config['batch_size'],
             n_ways=_config['task']['n_ways'],
             n_shots=_config['task']['n_shots'],
             n_queries=_config['task']['n_queries']

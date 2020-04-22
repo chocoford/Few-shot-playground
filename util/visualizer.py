@@ -12,7 +12,7 @@ class Visualizer():
         self.predImgDir = os.path.join(self.rootDir, "pred")
         self.gtImgDir = os.path.join(self.rootDir, "gt")
         self.i = 0
-        self.visualizeColor = [np.array([254, 67, 101]), np.array([30, 41, 61])]
+        self.visualizeColor = [np.array([30, 41, 61]), np.array([254, 67, 101])]
 
         os.makedirs(self.predImgDir, exist_ok=True)
         os.makedirs(self.gtImgDir, exist_ok=True)
