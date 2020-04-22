@@ -34,7 +34,7 @@ class Visualizer():
         img_size = pred.shape[-2:]
         assert pred.shape == target.shape
 
-        pred_visual = np.zeros(img_size[0], img_size[1], 3)
+        pred_visual = np.zeros((img_size[0], img_size[1], 3))
 
         color = [np.array([254, 67, 101]), np.array([30, 41, 61])]
 
