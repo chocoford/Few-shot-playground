@@ -131,8 +131,12 @@ def main(_run, _config, _log):
 
             query_pred, _ = model(support_images, support_fg_mask, support_bg_mask,
                                   query_images)
-            # _log.info(f'len of query_images: {len(query_images)}')
-            visualizer.saveImgs(query_images[0], str(i))
+            _log.info(f'shape of query_images: {query_images[0].shape}')
+            query_images_t = [query_image.cuda()
+                            for query_image in sample_batched['query_images_t']]
+            _log.info(f'shape of query_images_t: {query_images_t[0].shape}')
+
+            # visualizer.saveImgs(query_images[0], str(i))
                 
 
     #             metric.record(np.array(query_pred.argmax(dim=1)[0].cpu()),
