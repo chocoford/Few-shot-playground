@@ -73,7 +73,7 @@ class Visualizer():
         for i in range(imgs.shape[0]):
             # print(imgs[i].numpy().transpose((1,2,0)))
             img = imgs[i].numpy()
-            im = Image.fromArray(img)
+            im = Image.fromarray(img)
             im.save(f'{self.imgDir}/{name}_{i}.png')
 
 
