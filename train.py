@@ -19,6 +19,9 @@ from config import ex
 
 @ex.automain
 def main(_run, _config, _log):
+    """
+    从15个训练类里随机抽取一个类，然后抽取两张图片分别作为support和query
+    """
     if _run.observers:
         os.makedirs(f'{_run.observers[0].dir}/snapshots', exist_ok=True)
         for source_file, _ in _run.experiment_info['sources']:
@@ -49,6 +52,7 @@ def main(_run, _config, _log):
         make_data = coco_fewshot
     else:
         raise ValueError('Wrong config for dataset!')
+    # 和OSLSM的机制一样，labels[i]即pascal-5i
     labels = CLASS_LABELS[data_name][_config['label_sets']]
     transforms = Compose([Resize(size=_config['input_size']),
                           RandomMirror()])

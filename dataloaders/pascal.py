@@ -13,6 +13,7 @@ from .common import BaseDataset
 class VOC(BaseDataset):
     """
     Base Class for VOC Dataset
+    读取了照片及标记，对照片做了预处理。
 
     Args:
         base_dir:

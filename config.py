@@ -106,7 +106,7 @@ def cfg():
         'init_path': './pretrained_model/vgg16-397923af.pth',
         'VOC':{'data_dir': '../../Data/pascal-5i/',
                'data_split': 'trainaug',},
-        'COCO':{'data_dir': '../../data/COCO/',
+        'COCO':{'data_dir': '../../Data/COCO 2017/orign/trainval/',
                 'data_split': 'train',},
     }
 

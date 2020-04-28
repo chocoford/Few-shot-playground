@@ -35,7 +35,8 @@ class FewShotSeg(nn.Module):
 
     def forward(self, supp_imgs, fore_mask, back_mask, qry_imgs):
         """
-        Args:
+        Args
+        -------------
             supp_imgs: support images
                 way x shot x [B x 3 x H x W], list of lists of tensors
             fore_mask: foreground masks for support images
@@ -44,6 +45,10 @@ class FewShotSeg(nn.Module):
                 way x shot x [B x H x W], list of lists of tensors
             qry_imgs: query images
                 N x [B x 3 x H x W], list of tensors
+        Return
+        ---------------
+            query_pred: distance array 
+                [N+B x (1+way) x H x W]  eg. [1, 2, 417, 417]
         """
         n_ways = len(supp_imgs)
         n_shots = len(supp_imgs[0])

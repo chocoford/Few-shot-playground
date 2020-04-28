@@ -82,7 +82,8 @@ def fewShot(paired_sample, n_ways, n_shots, cnt_query, coco=False):
             MS COCO dataset
     """
     ###### Compose the support and query image list ######
-    cumsum_idx = np.cumsum([0,] + [n_shots + x for x in cnt_query])
+    #cumulate sum累积和
+    cumsum_idx = np.cumsum([0,] + [n_shots + x for x in cnt_query]) # [0, 2]
 
     # support class ids
     class_ids = [paired_sample[cumsum_idx[i]]['basic_class_id'] for i in range(n_ways)]
@@ -169,7 +170,8 @@ def fewShot(paired_sample, n_ways, n_shots, cnt_query, coco=False):
 def voc_fewshot(base_dir, split, transforms, to_tensor, labels, n_ways, n_shots, max_iters,
                 n_queries=1):
     """
-    Args:
+    Args
+    -----------
         base_dir:
             VOC dataset directory
         split:
@@ -180,7 +182,7 @@ def voc_fewshot(base_dir, split, transforms, to_tensor, labels, n_ways, n_shots,
         to_tensor:
             transformation to convert PIL Image to tensor
         labels:
-            object class labels of the data
+            object class labels of the data，即pascal-5i或者coco的
         n_ways:
             n-way few-shot learning, should be no more than # of object class labels
         n_shots:
@@ -189,6 +191,11 @@ def voc_fewshot(base_dir, split, transforms, to_tensor, labels, n_ways, n_shots,
             number of pairs
         n_queries:
             number of query images
+
+    Return
+    ---------
+        paired_data: PariedDataset
+            其实就是一个字典（因为经过了transform）{String: list}
     """
     voc = VOC(base_dir=base_dir, split=split, transforms=transforms, to_tensor=to_tensor)
     voc.add_attrib('basic', attrib_basic, {})
@@ -200,13 +207,17 @@ def voc_fewshot(base_dir, split, transforms, to_tensor, labels, n_ways, n_shots,
                                'class{}.txt'.format(label)), 'r') as f:
             sub_ids.append(f.read().splitlines())
     # Create sub-datasets and add class_id attribute
+    # subsets就是一个[Subset],每个Subset包含一个类所有照片，像pascal-5i时，这个就是一个包含15个Subset的list
     subsets = voc.subsets(sub_ids, [{'basic': {'class_id': cls_id}} for cls_id in labels])
 
     # Choose the classes of queries
-    cnt_query = np.bincount(random.choices(population=range(n_ways), k=n_queries), minlength=n_ways)
+    # random.choices这里从[0]里随机选取1个值返回列表
+    # np.bincount计算数组里每个值出现的次数，以下标的形式表示，比如4出现了4次则输出数组中第5个值为4（0开始）
+    cnt_query = np.bincount(random.choices(population=range(n_ways), k=n_queries), minlength=n_ways) #[1]
     # Set the number of images for each class
-    n_elements = [n_shots + x for x in cnt_query]
+    n_elements = [n_shots + x for x in cnt_query] # [2]
     # Create paired dataset
+    # 对于one-way one-shot就是从同一个类中随机采样两个样本
     paired_data = PairedDataset(subsets, n_elements=n_elements, max_iters=max_iters, same=False,
                                 pair_based_transforms=[
                                     (fewShot, {'n_ways': n_ways, 'n_shots': n_shots,

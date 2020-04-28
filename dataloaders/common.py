@@ -70,8 +70,8 @@ class BaseDataset(Dataset):
         Create subsets by ids
 
         Args:
-            sub_ids:
-                a sequence of sequences, each sequence contains data ids for one subset
+            sub_ids: shape: [[String]]
+                a list of indices_array, 每个元素都包含一个类的照片的所有索引
             sub_args_lst:
                 a list of args for some subset-specific auxiliary attribute function
 
@@ -79,7 +79,8 @@ class BaseDataset(Dataset):
         -------------
             subsets: a list of n of Subset
         """
-
+        
+        # 对每个类的索引，从所有类中找，所以indices也是[[int]]的形状
         indices = [[self.ids.index(id_) for id_ in ids] for ids in sub_ids]
         if sub_args_lst is not None:
             subsets = [Subset(dataset=self, indices=index, sub_attrib_args=args)
@@ -112,6 +113,7 @@ class PairedDataset(Dataset):
                 randomly choose k(k < # of datasets) datasets, then draw C_1, C_2, ..., C_k samples
                 from each dataset respectively.
                 Note the total number of elements will be (C_1 + C_2 + ... + C_k).
+                从datasests中选取len(n_elements)个datasets，每个datasets采样n_elements（对应）个样本
 
     Args:
         datasets:
@@ -131,8 +133,8 @@ class PairedDataset(Dataset):
                  pair_based_transforms=None):
         super().__init__()
         self.datasets = datasets
-        self.n_datasets = len(self.datasets)
-        self.n_data = [len(dataset) for dataset in self.datasets]
+        self.n_datasets = len(self.datasets) # 5
+        self.n_data = [len(dataset) for dataset in self.datasets] #每个Subset的样本数
         self.n_elements = n_elements
         self.max_iters = max_iters
         self.pair_based_transforms = pair_based_transforms
@@ -148,6 +150,7 @@ class PairedDataset(Dataset):
                 raise ValueError("When 'same=true', 'n_element' should be an integer.")
         else:
             if isinstance(self.n_elements, list):
+
                 self.indices = [[(dataset_idx, data_idx)
                                  for i, dataset_idx in enumerate(
                                      random.sample(range(self.n_datasets), k=len(self.n_elements)))
@@ -178,10 +181,11 @@ class Subset(Dataset):
     """
     Subset of a dataset at specified indices.
 
-    Args:
+    Args
+    ---------
         dataset:
             The whole Dataset
-        indices:
+        indices: expected shape: [int]
             Indices in the whole set selected for subset
         sub_attrib_args:
             Subset-specific arguments for attribute functions, expected a dict

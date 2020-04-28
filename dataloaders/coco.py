@@ -13,7 +13,8 @@ class COCOSeg(BaseDataset):
     """
     Modified Class for COCO Dataset
 
-    Args:
+    Args
+    ------------
         base_dir:
             COCO dataset directory
         split:
@@ -23,10 +24,15 @@ class COCOSeg(BaseDataset):
             transformations to be performed on images/masks
         to_tensor:
             transformation to convert PIL Image to tensor
+        
+    Return
+    -------------
+        sample: 字典<String: obj>: {'image': Image, 'label': Mask, 'imgae_t': tensor, id: int, ...}
+            coco data after transform & to_tensor, 后面两个键值是没用的。
     """
     def __init__(self, base_dir, split, transforms=None, to_tensor=None):
         super().__init__(base_dir)
-        self.split = split + '2014'
+        self.split = split + '2017'
         annFile = f'{base_dir}/annotations/instances_{self.split}.json'
         self.coco = COCO(annFile)
 
@@ -49,6 +55,7 @@ class COCOSeg(BaseDataset):
             image = image.convert('RGB')
 
         # Process masks
+        # 就是一张图片里的多个类的Mask标记
         anns = self.coco.loadAnns(annIds)
         semantic_masks = {}
         for ann in anns:
@@ -60,10 +67,11 @@ class COCOSeg(BaseDataset):
                 semantic_mask = np.zeros((img_meta['height'], img_meta['width']), dtype='uint8')
                 semantic_mask[mask == 1] = catId
                 semantic_masks[catId] = semantic_mask
+        # 对每一个类别生成一张mask图片
         semantic_masks = {catId: Image.fromarray(semantic_mask)
                           for catId, semantic_mask in semantic_masks.items()}
 
-        # No scribble/instance mask
+        # No scribble/instance mask，空的(｡ì _ í｡)
         instance_mask = Image.fromarray(np.zeros_like(semantic_mask, dtype='uint8'))
         scribble_mask = Image.fromarray(np.zeros_like(semantic_mask, dtype='uint8'))
 

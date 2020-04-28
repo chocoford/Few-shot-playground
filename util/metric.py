@@ -31,6 +31,7 @@ class Metric(object):
         Args:
             pred:
                 predicted mask array, expected shape is H x W
+                每一个位置上的值都是最可能的类的索引
             target:
                 target mask array, expected shape is H x W
             labels:
