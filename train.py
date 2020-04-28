@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Training Script"""
 import os
 import shutil
@@ -20,7 +21,7 @@ from config import ex
 @ex.automain
 def main(_run, _config, _log):
     """
-    从15个训练类里随机抽取一个类，然后抽取两张图片分别作为support和query
+    # 从15个训练类里随机抽取一个类，然后抽取两张图片分别作为support和query
     """
     if _run.observers:
         os.makedirs(f'{_run.observers[0].dir}/snapshots', exist_ok=True)
