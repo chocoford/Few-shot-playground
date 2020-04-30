@@ -22,8 +22,8 @@ class _FPN(nn.Module):
     """ FPN """
     def __init__(self, classes, class_agnostic):
         super(_FPN, self).__init__()
-        self.classes = classes
-        self.n_classes = len(classes)
+        # self.classes = classes
+        # self.n_classes = len(classes)
         self.class_agnostic = class_agnostic
         # loss
         self.RCNN_loss_cls = 0
