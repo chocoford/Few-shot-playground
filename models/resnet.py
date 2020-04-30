@@ -261,11 +261,11 @@ class resnet(_FPN):
     #   nn.ReLU(True)
     #   )
 
-    self.RCNN_cls_score = nn.Linear(1024, self.n_classes)
-    if self.class_agnostic:
-      self.RCNN_bbox_pred = nn.Linear(1024, 4)
-    else:
-      self.RCNN_bbox_pred = nn.Linear(1024, 4 * self.n_classes)
+    # self.RCNN_cls_score = nn.Linear(1024, self.n_classes)
+    # if self.class_agnostic:
+    #   self.RCNN_bbox_pred = nn.Linear(1024, 4)
+    # else:
+    #   self.RCNN_bbox_pred = nn.Linear(1024, 4 * self.n_classes)
 
     # Fix blocks
     for p in self.RCNN_layer0[0].parameters(): p.requires_grad=False
