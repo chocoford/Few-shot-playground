@@ -166,7 +166,7 @@ class _FPN(nn.Module):
             
     #     return roi_pool_feat
 
-    def forward(self, im_data, im_info, gt_boxes, num_boxes):
+    def forward(self, im_data):
         # bat/ch_size = im_data.size(0)
 
         # im_info = im_info.data
