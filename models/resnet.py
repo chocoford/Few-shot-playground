@@ -254,12 +254,12 @@ class resnet(_FPN):
     # ROI Pool feature downsampling
     self.RCNN_roi_feat_ds = nn.Conv2d(256, 256, kernel_size=3, stride=2, padding=1)
 
-    self.RCNN_top = nn.Sequential(
-      nn.Conv2d(256, 1024, kernel_size=cfg.POOLING_SIZE, stride=cfg.POOLING_SIZE, padding=0),
-      nn.ReLU(True),
-      nn.Conv2d(1024, 1024, kernel_size=1, stride=1, padding=0),
-      nn.ReLU(True)
-      )
+    # self.RCNN_top = nn.Sequential(
+    #   nn.Conv2d(256, 1024, kernel_size=cfg.POOLING_SIZE, stride=cfg.POOLING_SIZE, padding=0),
+    #   nn.ReLU(True),
+    #   nn.Conv2d(1024, 1024, kernel_size=1, stride=1, padding=0),
+    #   nn.ReLU(True)
+    #   )
 
     self.RCNN_cls_score = nn.Linear(1024, self.n_classes)
     if self.class_agnostic:
