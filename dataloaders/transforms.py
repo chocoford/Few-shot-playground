@@ -103,3 +103,34 @@ class ToTensorNormalize(object):
         sample['inst'] = inst
         sample['scribble'] = scribble
         return sample
+
+
+class ClipAndResize(object):
+    """
+    1. Clip images with accordingly masks
+    2. Resize images/masks to given size
+
+    Parameters
+    --------
+        size: output size
+    """
+    def __init__(self, size):
+        self.size = size
+
+    def __call__(self, sample):
+        img, label = sample['image'], sample['label']
+        inst, scribble = sample['inst'], sample['scribble']
+        img = tr_F.resize(img, self.size)
+        if isinstance(label, dict):
+            label = {catId: tr_F.resize(x, self.size, interpolation=Image.NEAREST)
+                     for catId, x in label.items()}
+        else:
+            label = tr_F.resize(label, self.size, interpolation=Image.NEAREST)
+        inst = tr_F.resize(inst, self.size, interpolation=Image.NEAREST)
+        scribble = tr_F.resize(scribble, self.size, interpolation=Image.ANTIALIAS)
+
+        sample['image'] = img
+        sample['label'] = label
+        sample['inst'] = inst
+        sample['scribble'] = scribble
+        return sample
