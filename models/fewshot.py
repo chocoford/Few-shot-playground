@@ -33,7 +33,7 @@ class FewShotSeg(nn.Module):
         # Encoder: VGG-16
         # self.encoder = nn.Sequential(OrderedDict([
         #     ('backbone', Encoder(in_channels, self.pretrained_path)), ]))
-        fpn = resnet()
+        fpn = resnet(20)
         fpn.create_architecture()
         self.encoder = nn.Sequential(OrderedDict([
             ('backbone', fpn), 
