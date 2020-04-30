@@ -30,8 +30,13 @@ class FewShotSeg(nn.Module):
         self.config = cfg or {'align': False}
 
         # Encoder: VGG-16
+        # self.encoder = nn.Sequential(OrderedDict([
+        #     ('backbone', Encoder(in_channels, self.pretrained_path)), ]))
+        fpn = resnet()
+        fpn.create_architecture()
         self.encoder = nn.Sequential(OrderedDict([
-            ('backbone', Encoder(in_channels, self.pretrained_path)), ]))
+            ('backbone', fpn), 
+        ]))
 
     def forward(self, supp_imgs, fore_mask, back_mask, qry_imgs):
         """
