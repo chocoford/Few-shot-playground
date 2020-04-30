@@ -9,6 +9,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .vgg import Encoder
+from .resnet import resnet
 
 
 class FewShotSeg(nn.Module):
