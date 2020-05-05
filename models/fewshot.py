@@ -25,19 +25,21 @@ class FewShotSeg(nn.Module):
             model configurations
     """
 
-    def __init__(self, in_channels=3, pretrained_path=None, cfg=None):
+    def __init__(self, in_channels=3, pretrained_path=None, cfg=None, encoder="vgg"):
         super().__init__()
         self.pretrained_path = pretrained_path
         self.config = cfg or {'align': False}
 
-        # Encoder: VGG-16
-        # self.encoder = nn.Sequential(OrderedDict([
-        #     ('backbone', Encoder(in_channels, self.pretrained_path)), ]))
-        fpn = resnet()
-        fpn.create_architecture()
-        self.encoder = nn.Sequential(OrderedDict([
-            ('backbone', fpn), 
-        ]))
+        if encoder == "vgg":
+            # Encoder: VGG-16
+            self.encoder = nn.Sequential(OrderedDict([
+                ('backbone', Encoder(in_channels, self.pretrained_path)), ]))
+        elif encoder == "resnet" :
+            fpn = resnet()
+            fpn.create_architecture()
+            self.encoder = nn.Sequential(OrderedDict([
+                ('backbone', fpn), 
+            ]))
 
     def forward(self, supp_imgs, fore_mask, back_mask, qry_imgs):
         """

@@ -8,13 +8,6 @@ import torchvision.models as models
 from torch.autograd import Variable
 import numpy as np
 import torchvision.utils as vutils
-# from model.utils.config import cfg
-# from model.rpn.rpn_fpn import _RPN_FPN
-# from model.roi_pooling.modules.roi_pool import _RoIPooling
-# from model.roi_crop.modules.roi_crop import _RoICrop
-# from model.roi_align.modules.roi_align import RoIAlignAvg
-# from model.rpn.proposal_target_layer import _ProposalTargetLayer
-# from model.utils.net_utils import _smooth_l1_loss, _crop_pool_layer, _affine_grid_gen, _affine_theta
 import time
 import pdb
 
@@ -26,8 +19,8 @@ class _FPN(nn.Module):
         # self.n_classes = len(classes)
         # self.class_agnostic = class_agnostic
         # loss
-        self.RCNN_loss_cls = 0
-        self.RCNN_loss_bbox = 0
+        # self.RCNN_loss_cls = 0
+        # self.RCNN_loss_bbox = 0
 
         self.maxpool2d = nn.MaxPool2d(1, stride=2)
         # define rpn
