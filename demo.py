@@ -4,10 +4,10 @@ from models.fewshot import FewShotSeg
 
 # from config import ex
 if __name__ == '__main__':
-    model = FewShotSeg(pretrained_path='./pretrained_model/vgg16-397923af.pth', cfg={'align': True,})
+    # model = FewShotSeg(pretrained_path='./pretrained_model/vgg16-397923af.pth', cfg={'align': True,})
 
-    # model = resnet(20)
-    # model.create_architecture()
+    model = resnet()
+    model.create_architecture()
 
 
     # Find total parameters and trainable parameters
