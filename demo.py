@@ -11,7 +11,7 @@ if __name__ == '__main__':
 
 
     # Find total parameters and trainable parameters
-    total_num = sum(p.numel() for p in net.parameters())
-    trainable_num = sum(p.numel() for p in net.parameters() if p.requires_grad)
+    total_num = sum(p.numel() for p in model.parameters())
+    trainable_num = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print("total num: ", total_num)
     print("trainable num: ",trainable_num)
