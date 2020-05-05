@@ -3,10 +3,8 @@ from models.resnet import resnet
 from models.fewshot import FewShotSeg
 
 # from config import ex
-
-# @ex.automain
-# def main(_run, _config, _log):
-    model = FewShotSeg(pretrained_path=_config['path']['init_path'], cfg=_config['model'])
+if __name__ == '__main__':
+    model = FewShotSeg(pretrained_path='./pretrained_model/vgg16-397923af.pth', cfg={'align': True,})
 
     # model = resnet(20)
     # model.create_architecture()
