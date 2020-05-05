@@ -216,13 +216,13 @@ def resnet152(pretrained=False):
   return model
 
 class resnet(_FPN):
-  def __init__(self, classes, num_layers=101, pretrained=False, class_agnostic=False):
+  def __init__(self, classes=0, num_layers=101, pretrained=False, class_agnostic=False):
     self.model_path = 'data/pretrained_model/resnet101_caffe.pth'
     self.dout_base_model = 256
     self.pretrained = pretrained
     self.class_agnostic = class_agnostic
 
-    _FPN.__init__(self, classes, class_agnostic)
+    _FPN.__init__(self)#, classes, class_agnostic)
 
   def _init_modules(self):
     resnet = resnet101()
