@@ -32,7 +32,7 @@ def cfg():
 
 
     if mode == 'train':
-        dataset = 'VOC'  # 'VOC' or 'COCO'
+        dataset = 'COCO'  # 'VOC' or 'COCO'
         n_steps = 30000
         label_sets = 1
         batch_size = 1
