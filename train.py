@@ -32,19 +32,16 @@ def main(_run, _config, _log):
             _run.observers[0].save_file(source_file, f'source/{source_file}')
         shutil.rmtree(f'{_run.observers[0].basedir}/_sources')
 
-
     set_seed(_config['seed'])
     cudnn.enabled = True
     cudnn.benchmark = True
     torch.cuda.set_device(device=_config['gpu_id'])
     torch.set_num_threads(1)
 
-
     _log.info('###### Create model ######')
-    model = FewShotSeg(pretrained_path=_config['path']['init_path'], cfg=_config['model'], encoder=_config['encoder'])
-    model = nn.DataParallel(model.cuda(), device_ids=[_config['gpu_id'],])
-    model.train()
-
+    model = FewShotSeg(
+        pretrained_path=_config['path']['init_path'], cfg=_config['model'], encoder=_config['encoder'])
+    model = nn.DataParallel(model.cuda(), device_ids=[_config['gpu_id'], ])
 
     _log.info('###### Load data ######')
     data_name = _config['dataset']
@@ -58,19 +55,41 @@ def main(_run, _config, _log):
     labels = CLASS_LABELS[data_name][_config['label_sets']]
     transforms = Compose([Resize(size=_config['input_size']),
                           RandomMirror()])
-    dataset = make_data(
+    train_ds = make_data(
         base_dir=_config['path'][data_name]['data_dir'],
         split=_config['path'][data_name]['data_split'],
         transforms=transforms,
         to_tensor=ToTensorNormalize(),
-        labels=labels,
+        labels=labels,  # 与val唯一不同
         max_iters=_config['n_steps'] * _config['batch_size'],
         n_ways=_config['task']['n_ways'],
         n_shots=_config['task']['n_shots'],
         n_queries=_config['task']['n_queries']
     )
-    trainloader = DataLoader(
-        dataset,
+
+    valid_ds = make_data(
+        base_dir=_config['path'][data_name]['data_dir'],
+        split=_config['path'][data_name]['data_split'],
+        transforms=transforms,
+        to_tensor=ToTensorNormalize(),
+        labels=labels[:3],
+        max_iters=_config['n_steps'] * _config['batch_size'],
+        n_ways=_config['task']['n_ways'],
+        n_shots=_config['task']['n_shots'],
+        n_queries=_config['task']['n_queries']
+    )
+
+    train_dl = DataLoader(
+        train_ds,
+        batch_size=_config['batch_size'],
+        shuffle=True,
+        num_workers=1,
+        pin_memory=True,
+        drop_last=True
+    )
+
+    valid_dl = DataLoader(
+        train_ds,
         batch_size=_config['batch_size'],
         shuffle=True,
         num_workers=1,
@@ -80,13 +99,18 @@ def main(_run, _config, _log):
 
     _log.info('###### Set optimizer ######')
     optimizer = torch.optim.SGD(model.parameters(), **_config['optim'])
-    scheduler = MultiStepLR(optimizer, milestones=_config['lr_milestones'], gamma=0.1)
+    scheduler = MultiStepLR(
+        optimizer, milestones=_config['lr_milestones'], gamma=0.1)
     criterion = nn.CrossEntropyLoss(ignore_index=_config['ignore_label'])
 
     i_iter = 0
-    log_loss = {'loss': 0, 'align_loss': 0}
+    log_loss = {'loss': 0, 'align_loss': 0, 'val_loss': 0}
+    train_losses = []
+    align_losses = []
+    val_losses = []
     _log.info('###### Training ######')
-    for i_iter, sample_batched in enumerate(trainloader):
+    for i_iter, sample_batched in enumerate(train_dl):
+        model.train()
         # Prepare input
         support_images = [[shot.cuda() for shot in way]
                           for way in sample_batched['support_images']]
@@ -117,7 +141,20 @@ def main(_run, _config, _log):
         _run.log_scalar('align_loss', align_loss)
         log_loss['loss'] += query_loss
         log_loss['align_loss'] += align_loss
+        train_losses.append(log_loss['loss'] / (i_iter + 1))
+        align_losses.append(log_loss['align_loss'] / (i_iter + 1))
 
+        # val loss
+        model.eval()
+        with torch.no_grad():
+            val_query_pred, _ = model(support_images, support_fg_mask, support_bg_mask,
+                                                   query_images)
+            val_loss = criterion(val_query_pred, query_labels)
+
+            val_loss = val_loss.detach().data.cpu().numpy()
+            _run.log_scalar('val_loss', val_loss)
+            log_loss['val_loss'] += val_loss
+            val_losses.append(log_loss['val_loss']/(i_iter + 1))
 
         # print loss and take snapshots
         if (i_iter + 1) % _config['print_interval'] == 0:
@@ -133,3 +170,15 @@ def main(_run, _config, _log):
     _log.info('###### Saving final model ######')
     torch.save(model.state_dict(),
                os.path.join(f'{_run.observers[0].dir}/snapshots', f'{i_iter + 1}.pth'))
+    
+    import matplotlib.pyplot as plt
+    x = range(1, len(val_losses)+1)
+    fig, ax = plt.subplots()  
+    ax.plot(x, val_losses, label='val loss') 
+    ax.plot(x, train_losses, label='train loss')
+    ax.plot(x, align_losses, label='align loss')
+    ax.set_xlabel('iteration')  
+    ax.set_ylabel('loss') 
+    ax.set_title("损失")
+    ax.legend() 
+    plt.savefig(f'{_run.observers[0].dir}/loss.png')

@@ -32,7 +32,7 @@ def cfg():
     encoder = "resnet"
 
     if mode == 'train':
-        dataset = 'COCO'  # 'VOC' or 'COCO'
+        dataset = 'VOC'  # 'VOC' or 'COCO'
         n_steps = 30000
         label_sets = 1
         batch_size = 1
