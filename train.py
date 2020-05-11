@@ -18,7 +18,7 @@ from dataloaders.transforms import RandomMirror, Resize, ToTensorNormalize
 from util.utils import set_seed, CLASS_LABELS
 from config import ex
 
-
+  
 @ex.automain
 def main(_run, _config, _log):
     """
