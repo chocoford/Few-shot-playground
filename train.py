@@ -67,17 +67,17 @@ def main(_run, _config, _log):
         n_queries=_config['task']['n_queries']
     )
 
-    valid_ds = make_data(
-        base_dir=_config['path'][data_name]['data_dir'],
-        split=_config['path'][data_name]['data_split'],
-        transforms=transforms,
-        to_tensor=ToTensorNormalize(),
-        labels=labels[:3],
-        max_iters=_config['n_steps'] * _config['batch_size'],
-        n_ways=_config['task']['n_ways'],
-        n_shots=_config['task']['n_shots'],
-        n_queries=_config['task']['n_queries']
-    )
+    # valid_ds = make_data(
+    #     base_dir=_config['path'][data_name]['data_dir'],
+    #     split=_config['path'][data_name]['data_split'],
+    #     transforms=transforms,
+    #     to_tensor=ToTensorNormalize(),
+    #     labels=labels[:3],
+    #     max_iters=_config['n_steps'] * _config['batch_size'],
+    #     n_ways=_config['task']['n_ways'],
+    #     n_shots=_config['task']['n_shots'],
+    #     n_queries=_config['task']['n_queries']
+    # )
 
     train_dl = DataLoader(
         train_ds,
@@ -88,14 +88,14 @@ def main(_run, _config, _log):
         drop_last=True
     )
 
-    valid_dl = DataLoader(
-        train_ds,
-        batch_size=_config['batch_size'],
-        shuffle=True,
-        num_workers=1,
-        pin_memory=True,
-        drop_last=True
-    )
+    # valid_dl = DataLoader(
+    #     train_ds,
+    #     batch_size=_config['batch_size'],
+    #     shuffle=True,
+    #     num_workers=1,
+    #     pin_memory=True,
+    #     drop_last=True
+    # )
 
     _log.info('###### Set optimizer ######')
     optimizer = torch.optim.SGD(model.parameters(), **_config['optim'])
@@ -145,16 +145,16 @@ def main(_run, _config, _log):
         align_losses.append(log_loss['align_loss'] / (i_iter + 1))
 
         # val loss
-        model.eval()
-        with torch.no_grad():
-            val_query_pred, _ = model(support_images, support_fg_mask, support_bg_mask,
-                                                   query_images)
-            val_loss = criterion(val_query_pred, query_labels)
+        # model.eval()
+        # with torch.no_grad():
+        #     val_query_pred, _ = model(support_images, support_fg_mask, support_bg_mask,
+        #                                            query_images)
+        #     val_loss = criterion(val_query_pred, query_labels)
 
-            val_loss = val_loss.detach().data.cpu().numpy()
-            _run.log_scalar('val_loss', val_loss)
-            log_loss['val_loss'] += val_loss
-            val_losses.append(log_loss['val_loss']/(i_iter + 1))
+        #     val_loss = val_loss.detach().data.cpu().numpy()
+        #     _run.log_scalar('val_loss', val_loss)
+        #     log_loss['val_loss'] += val_loss
+        #     val_losses.append(log_loss['val_loss']/(i_iter + 1))
 
         # print loss and take snapshots
         if (i_iter + 1) % _config['print_interval'] == 0:
@@ -174,7 +174,7 @@ def main(_run, _config, _log):
     import matplotlib.pyplot as plt
     x = range(1, len(val_losses)+1)
     fig, ax = plt.subplots()  
-    ax.plot(x, val_losses, label='val loss') 
+    # ax.plot(x, val_losses, label='val loss') 
     ax.plot(x, train_losses, label='train loss')
     ax.plot(x, align_losses, label='align loss')
     ax.set_xlabel('iteration')  
