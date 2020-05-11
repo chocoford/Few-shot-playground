@@ -181,4 +181,5 @@ def main(_run, _config, _log):
     ax.set_ylabel('loss') 
     ax.set_title("损失")
     ax.legend() 
+    
     plt.savefig(f'{_run.observers[0].dir}/loss.png')
