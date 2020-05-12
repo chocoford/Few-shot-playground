@@ -172,8 +172,8 @@ def main(_run, _config, _log):
                os.path.join(f'{_run.observers[0].dir}/snapshots', f'{i_iter + 1}.pth'))
     
     import matplotlib.pyplot as plt
-    x = range(1, len(val_losses)+1)
-    fig, ax = plt.subplots()  
+    x = [i for i in range(1, len(train_losses)+1)]
+    fig, ax = plt.subplots()
     # ax.plot(x, val_losses, label='val loss') 
     ax.plot(x, train_losses, label='train loss')
     ax.plot(x, align_losses, label='align loss')
