@@ -29,7 +29,11 @@ def cfg():
     cuda_visable = '0, 1, 2, 3, 4, 5, 6, 7'
     gpu_id = 0
     mode = 'test' # 'train' or 'test'
+    
+    # playground
     encoder = "resnet"
+    theme = "be_nothing"
+    
 
     if mode == 'train':
         dataset = 'VOC'  # 'VOC' or 'COCO'
@@ -44,6 +48,7 @@ def cfg():
 
         model = {
             'align': True,
+            'average_mode' = 'origin'
         }
 
         task = {
@@ -102,7 +107,7 @@ def cfg():
 
 
     path = {
-        'log_dir': './runs',
+        'log_dir': f'./runs/{theme}',
         'init_path': './pretrained_model/vgg16-397923af.pth',
         'VOC':{'data_dir': '../../Data/pascal-5i/',
                'data_split': 'trainaug',},

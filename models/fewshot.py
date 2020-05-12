@@ -144,20 +144,40 @@ class FewShotSeg(nn.Module):
         """
         fts = F.interpolate(
             fts, size=mask.shape[-2:], mode='bilinear')  # 采样到与mask一样的大小
+
+        # playground
+        if self.config['average_mode'] == 'channel_wise_average':
+            valid_fts = fts * mask[None, ...]
+            ones = torch.ones_like(valid_fts)
+            zeros = torch.zeros_like(valid_fts)
+            masked_fts = torch.sum(valid_fts, dim=(2, 3)) \
+            / (mask[None, ...].sum(dim=(2, 3)).repeat(fts.shape[:2]) \
+            + torch.where(valid_fts > 0, ones, zeros).sum(dim=(2,3)) + 1e-5)
+        elif self.config['average_mode'] == 'channel_wise_weighted_average':
+            masked_fts = torch.sum(fts * mask[None, ...], dim=(2, 3)) \
+            / (mask[None, ...].sum(dim=(2, 3)) + 1e-5)
+        
         # 把整个输入变成一个向量
-        masked_fts = torch.sum(fts * mask[None, ...], dim=(2, 3)) \
-            / (mask[None, ...].sum(dim=(2, 3)) + 1e-5)  # 1 x C
+        else:
+            masked_fts = torch.sum(fts * mask[None, ...], dim=(2, 3)) \
+                / (mask[None, ...].sum(dim=(2, 3)) + 1e-5)  # 1 x C
         return masked_fts
 
     def getPrototype(self, fg_fts, bg_fts):
         """
         Average the features to obtain the prototype
 
-        Args:
+        Parameters
+        ----------
             fg_fts: lists of list of foreground features for each way/shot, 就是论文中公式(1)中的右边
                 expect shape: Wa x Sh x [1 x C]
             bg_fts: lists of list of background features for each way/shot, 就是论文中公式(2)中的右边
                 expect shape: Wa x Sh x [1 x C]
+
+        Returns
+        -----------
+            fg_prototypes: expected shape: way x [1 x C]
+            bg_prototype:
         """
         n_ways, n_shots = len(fg_fts), len(fg_fts[0])
         fg_prototypes = [sum(way) / n_shots for way in fg_fts]
