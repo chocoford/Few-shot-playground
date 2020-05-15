@@ -184,7 +184,7 @@ class _FPN(nn.Module):
 
         # p6 = self.maxpool2d(p5)
 
-        return p2
+        return p2#[p2, p3, p4, p5]
 
         # 下面的不需要了，只需要FPN提取出来的特征图
 

@@ -23,7 +23,7 @@ for source_file in sources_to_save:
 
 @ex.config
 def cfg():
-    """Default configurations"""
+    """exp"""
     input_size = (417, 417)
     seed = 1234
     cuda_visable = '0, 1, 2, 3, 4, 5, 6, 7'
@@ -31,7 +31,7 @@ def cfg():
     mode = 'test' # 'train' or 'test'
     
     # playground
-    encoder = "resnet"
+    encoder = "vgg"
     theme = "be_nothing"
     
 
@@ -44,11 +44,14 @@ def cfg():
         align_loss_scaler = 1
         ignore_label = 255
         print_interval = 100
-        save_pred_every = 10000
+        save_pred_every = 5000
 
         model = {
             'align': True,
-            'average_mode' = 'origin'
+            'cwa': False, # channel-wise average
+            'cwwa': False, # channel-wise weighted average
+            'no_pbg': False, # no background prototype
+            'us_first': False, # upsampling first then calculate distance.
         }
 
         task = {
@@ -83,7 +86,7 @@ def cfg():
 
         # Set model config from the snapshot string
         model = {}
-        for key in ['align',]:
+        for key in ['align', 'cwa', 'cwwa', 'no_pbg', 'us_first']:
             model[key] = key in snapshot
 
         # Set label_sets from the snapshot string

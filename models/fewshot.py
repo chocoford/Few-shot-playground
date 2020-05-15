@@ -34,7 +34,7 @@ class FewShotSeg(nn.Module):
             # Encoder: VGG-16
             self.encoder = nn.Sequential(OrderedDict([
                 ('backbone', Encoder(in_channels, self.pretrained_path)), ]))
-        elif encoder == "resnet" :
+        elif encoder == "fpn" :
             fpn = resnet()
             fpn.create_architecture()
             self.encoder = nn.Sequential(OrderedDict([
@@ -84,6 +84,7 @@ class FewShotSeg(nn.Module):
         align_loss = 0
         outputs = []
         for epi in range(batch_size):
+            query_fts = qry_fts[:, epi]
             ###### Extract prototype 获得公式1、2中右半边的值######
             supp_fg_fts = [
                 [self.getFeatures(supp_fts[way, shot, [epi]], fore_mask[way, shot, [
@@ -99,15 +100,37 @@ class FewShotSeg(nn.Module):
                 supp_fg_fts, supp_bg_fts)
 
             ###### Compute the distance ######
-            prototypes = [bg_prototype, ] + fg_prototypes
-            dist = [self.calDist(qry_fts[:, epi], prototype)
-                    for prototype in prototypes]
-            pred = torch.stack(dist, dim=1)  # N x (1 + Wa) x H' x W'
-            outputs.append(F.interpolate(pred, size=img_size, mode='bilinear'))
-
+            if self.config['no_pbg']: 
+                prototypes = fg_prototypes
+            else:
+                prototypes = [bg_prototype, ] + fg_prototypes
+            
+            if self.config['us_first']:
+                # 先放大再比较
+                query_fts = F.interpolate(query_fts, size=img_size, mode='bilinear')
+                dist = [self.calDist(query_fts, prototype)
+                        for prototype in prototypes]
+                pred = torch.stack(dist, dim=1)  # N x (1 + Wa) x H x W
+                if self.config['no_pbg']:
+                    zeros = torch.zeros_like(pred)
+                    pred = torch.where(pred > 0.5, pred, zeros)
+                outputs.append(pred)
+            else:
+                dist = [self.calDist(query_fts, prototype)
+                        for prototype in prototypes]
+                pred = torch.stack(dist, dim=1)  # N x (1 + Wa) x H' x W'
+                if self.config['no_pbg']:
+                    zeros = torch.zeros_like(pred)
+                    pred = F.interpolate(pred, size=img_size, mode='bilinear')
+                    pred = torch.where(pred > 0.5, pred, zeros)
+                    outputs.append(pred)
+                else:
+                    outputs.append(F.interpolate(pred, size=img_size, mode='bilinear'))
+            
+                
             ###### Prototype alignment loss ######
             if self.config['align'] and self.training:
-                align_loss_epi = self.alignLoss(qry_fts[:, epi], pred, supp_fts[:, :, epi],
+                align_loss_epi = self.alignLoss(query_fts, pred, supp_fts[:, :, epi],
                                                 fore_mask[:, :, epi], back_mask[:, :, epi])
                 align_loss += align_loss_epi
 
@@ -115,24 +138,26 @@ class FewShotSeg(nn.Module):
         output = output.view(-1, *output.shape[2:])
         return output, align_loss / batch_size
 
-    def calDist(self, fts, prototype, scaler=20):
+    def calDist(self, fts, prototype, scaler=20, threshold=None):
         """
         Calculate the distance between features and prototypes
         --------
         Args
         --------
             fts: input features
-                expect shape: N x C x H x W
+                expect shape: N x C x H' x W'
             prototype: prototype of one semantic class
                 expect shape: 1 x C
+            threshold: only valid when ignoring background. Define whether 
         Return
         --------
             dist: cosine distance.
-                expect shape: N x H x W
+                expect shape: N x H' x W'
         """
         dist = F.cosine_similarity(
             fts, prototype[..., None, None], dim=1) * scaler
         return dist
+
 
     def getFeatures(self, fts, mask):
         """
@@ -146,14 +171,14 @@ class FewShotSeg(nn.Module):
             fts, size=mask.shape[-2:], mode='bilinear')  # 采样到与mask一样的大小
 
         # playground
-        if self.config['average_mode'] == 'channel_wise_average':
+        if self.config['cwa']:
             valid_fts = fts * mask[None, ...]
             ones = torch.ones_like(valid_fts)
             zeros = torch.zeros_like(valid_fts)
             masked_fts = torch.sum(valid_fts, dim=(2, 3)) \
             / (mask[None, ...].sum(dim=(2, 3)).repeat(fts.shape[:2]) \
             + torch.where(valid_fts > 0, ones, zeros).sum(dim=(2,3)) + 1e-5)
-        elif self.config['average_mode'] == 'channel_wise_weighted_average':
+        elif self.config['cwwa']:
             masked_fts = torch.sum(fts * mask[None, ...], dim=(2, 3)) \
             / (mask[None, ...].sum(dim=(2, 3)) + 1e-5)
         
@@ -190,7 +215,7 @@ class FewShotSeg(nn.Module):
 
         Args:
             qry_fts: embedding features for query images
-                expect shape: N x C x H' x W'
+                expect shape: N x C x H' x W' or N x C x H x W if us_first
             pred: predicted segmentation score，其中pred[:, 0]是背景
                 expect shape: N x (1 + Wa) x H x W
             supp_fts: embedding fatures for support images
@@ -225,11 +250,17 @@ class FewShotSeg(nn.Module):
             prototypes = [qry_prototypes[[0]], qry_prototypes[[way + 1]]] #[[0]]相当于增加了一个维度
             for shot in range(n_shots):
                 img_fts = supp_fts[way, [shot]]
-                supp_dist = [self.calDist(img_fts, prototype)
-                             for prototype in prototypes]
-                supp_pred = torch.stack(supp_dist, dim=1)
-                supp_pred = F.interpolate(supp_pred, size=fore_mask.shape[-2:],
-                                          mode='bilinear')
+                if self.config['us_first']:
+                    img_fts = F.interpolate(img_fts, size=fore_mask.shape[-2:], mode='bilinear')
+                    supp_dist = [self.calDist(img_fts, prototype)
+                                 for prototype in prototypes]
+                    supp_pred = torch.stack(supp_dist, dim=1)
+                else:
+                    supp_dist = [self.calDist(img_fts, prototype)
+                                for prototype in prototypes]
+                    supp_pred = torch.stack(supp_dist, dim=1)
+                    supp_pred = F.interpolate(supp_pred, size=fore_mask.shape[-2:],
+                                            mode='bilinear')
                 # Construct the support Ground-Truth segmentation
                 supp_label = torch.full_like(fore_mask[way, shot], 255,
                                              device=img_fts.device).long()
