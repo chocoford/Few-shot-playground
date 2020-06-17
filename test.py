@@ -20,6 +20,9 @@ from util.utils import set_seed, CLASS_LABELS, get_bbox
 from config import ex
 
 
+from skimage.segmentation import slic, mark_boundaries
+
+
 @ex.automain
 def main(_run, _config, _log):
     for source_file, _ in _run.experiment_info['sources']:
@@ -122,6 +125,27 @@ def main(_run, _config, _log):
                                 for query_image in sample_batched['query_images']]
                 query_labels = torch.cat(
                     [query_label.cuda()for query_label in sample_batched['query_labels']], dim=0)
+
+                if True:#_config['superpixel_preSeg']:
+                    std= [0.229, 0.224, 0.225]
+                    mean=[0.485, 0.456, 0.406]
+                    query_image = torch.cat([query_image[0] for query_image in sample_batched['query_images']])
+                    print(query_image.shape)
+                    query_image[0] = query_image[0,:] * std[0] + mean[0]
+                    query_image[1] = query_image[1,:] * std[1] + mean[1]
+                    query_image[2] = query_image[2,:] * std[2] + mean[2]
+                    print(query_image)
+                    image = query_image.permute(1,2,0).double().numpy()
+                    segments = torch.from_numpy(slic(image, n_segments=500)) # [H, W]
+                    # print(segments.shape)
+                    # img = mark_boundaries(image, segments, color=(1, 0, 0))
+                    # img = np.uint8(img*255)
+                    # print(img)
+                    # from PIL import Image
+                    # im = Image.fromarray(img)
+                    # im.save("segments.jpg")
+                    # exit(-1)
+
 
                 # [1, 2, 417, 417]
                 query_pred, _ = model(support_images, support_fg_mask, support_bg_mask,

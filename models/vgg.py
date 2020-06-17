@@ -67,8 +67,15 @@ class Encoder(nn.Module):
             keys = list(dic.keys())
             new_dic = self.state_dict()
             new_keys = list(new_dic.keys())
-
+            # print(len(keys))
+            # print(keys)
+            # print(len(new_keys))
+            # print(new_keys)
             for i in range(26):
                 new_dic[new_keys[i]] = dic[keys[i]]
 
             self.load_state_dict(new_dic)
+
+
+if __name__ == "__main__":
+    encoder = Encoder(pretrained_path="../pretrained_model/vgg16-397923af.pth")

@@ -105,15 +105,16 @@ class FewShotSeg(nn.Module):
             else:
                 prototypes = [bg_prototype, ] + fg_prototypes
             
-            if self.config['us_first']:
+            if self.config['superpixel_preSeg']:
                 # 先放大再比较
                 query_fts = F.interpolate(query_fts, size=img_size, mode='bilinear')
-                dist = [self.calDist(query_fts, prototype)
-                        for prototype in prototypes]
-                pred = torch.stack(dist, dim=1)  # N x (1 + Wa) x H x W
                 if self.config['no_pbg']:
-                    zeros = torch.zeros_like(pred)
-                    pred = torch.where(pred > 0.5, pred, zeros)
+                    dist = [self.calDist(query_fts, prototype, threshold=0.5)
+                            for prototype in prototypes]
+                else:
+                    dist = [self.calDist(query_fts, prototype)
+                            for prototype in prototypes]
+                pred = torch.stack(dist, dim=1)  # N x (1 + Wa) x H x W
                 outputs.append(pred)
             else:
                 dist = [self.calDist(query_fts, prototype)
@@ -138,7 +139,7 @@ class FewShotSeg(nn.Module):
         output = output.view(-1, *output.shape[2:])
         return output, align_loss / batch_size
 
-    def calDist(self, fts, prototype, scaler=20, threshold=None):
+    def calDist(self, fts, prototype, threshold=None, scaler=20):
         """
         Calculate the distance between features and prototypes
         --------
@@ -152,10 +153,13 @@ class FewShotSeg(nn.Module):
         Return
         --------
             dist: cosine distance.
-                expect shape: N x H' x W'
+                expect shape: N x H' x W' or N x H x W if up_first
         """
         dist = F.cosine_similarity(
             fts, prototype[..., None, None], dim=1) * scaler
+        if threshold:
+            zeros = torch.zeros_like(dist)
+            dist = torch.where(dist > 0.5, dist, zeros)
         return dist
 
 
@@ -178,7 +182,7 @@ class FewShotSeg(nn.Module):
             masked_fts = torch.sum(valid_fts, dim=(2, 3)) \
             / (mask[None, ...].sum(dim=(2, 3)).repeat(fts.shape[:2]) \
             + torch.where(valid_fts > 0, ones, zeros).sum(dim=(2,3)) + 1e-5)
-        elif self.config['cwwa']:
+        elif self.config['cwwa']: 
             masked_fts = torch.sum(fts * mask[None, ...], dim=(2, 3)) \
             / (mask[None, ...].sum(dim=(2, 3)) + 1e-5)
         
@@ -247,13 +251,20 @@ class FewShotSeg(nn.Module):
             if way in skip_ways:
                 continue
             # Get the query prototypes
-            prototypes = [qry_prototypes[[0]], qry_prototypes[[way + 1]]] #[[0]]相当于增加了一个维度
+            if self.config['no_pbg']:
+                prototypes = [qry_prototypes[[way + 1]]]
+            else:
+                prototypes = [qry_prototypes[[0]], qry_prototypes[[way + 1]]] #[[0]]相当于增加了一个维度
             for shot in range(n_shots):
                 img_fts = supp_fts[way, [shot]]
                 if self.config['us_first']:
                     img_fts = F.interpolate(img_fts, size=fore_mask.shape[-2:], mode='bilinear')
-                    supp_dist = [self.calDist(img_fts, prototype)
-                                 for prototype in prototypes]
+                    if self.config['no_pbg']:
+                        supp_dist = [self.calDist(img_fts, prototype, threshold=0.5)
+                                    for prototype in prototypes]
+                    else: 
+                        supp_dist = [self.calDist(img_fts, prototype)
+                                    for prototype in prototypes]
                     supp_pred = torch.stack(supp_dist, dim=1)
                 else:
                     supp_dist = [self.calDist(img_fts, prototype)
