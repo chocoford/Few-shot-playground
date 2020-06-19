@@ -1,5 +1,5 @@
 """Evaluation Script"""
-import os
+import os, math
 import shutil
 
 import tqdm
@@ -18,10 +18,10 @@ from dataloaders.transforms import Resize, DilateScribble
 from util.metric import Metric
 from util.utils import set_seed, CLASS_LABELS, get_bbox
 from config import ex
-
+from util.to_image import save_image
 
 from skimage.segmentation import slic, mark_boundaries
-
+from PIL import Image
 
 @ex.automain
 def main(_run, _config, _log):
@@ -61,7 +61,6 @@ def main(_run, _config, _log):
     if _config['scribble_dilation'] > 0:
         transforms.append(DilateScribble(size=_config['scribble_dilation']))
     transforms = Compose(transforms)
-
 
     _log.info('###### Testing begins ######')
     metric = Metric(max_label=max_label, n_runs=_config['n_runs'])
@@ -125,18 +124,19 @@ def main(_run, _config, _log):
                                 for query_image in sample_batched['query_images']]
                 query_labels = torch.cat(
                     [query_label.cuda()for query_label in sample_batched['query_labels']], dim=0)
-
-                if True:#_config['superpixel_preSeg']:
+                segments = torch.rand(1)
+                if _config['superpixel_preSeg'] == True:
                     std= [0.229, 0.224, 0.225]
                     mean=[0.485, 0.456, 0.406]
                     query_image = torch.cat([query_image[0] for query_image in sample_batched['query_images']])
-                    print(query_image.shape)
+                    # print(query_image.shape)
                     query_image[0] = query_image[0,:] * std[0] + mean[0]
                     query_image[1] = query_image[1,:] * std[1] + mean[1]
                     query_image[2] = query_image[2,:] * std[2] + mean[2]
-                    print(query_image)
+                    # print(query_image)
                     image = query_image.permute(1,2,0).double().numpy()
-                    segments = torch.from_numpy(slic(image, n_segments=500)) # [H, W]
+                    segments = torch.from_numpy(slic(image, n_segments=_config['superpixel_preSeg_num'])) # [H, W]
+                    # print(f'num of segments: {torch.max(segments)}')
                     # print(segments.shape)
                     # img = mark_boundaries(image, segments, color=(1, 0, 0))
                     # img = np.uint8(img*255)
@@ -149,11 +149,12 @@ def main(_run, _config, _log):
 
                 # [1, 2, 417, 417]
                 query_pred, _ = model(support_images, support_fg_mask, support_bg_mask,
-                                      query_images)
+                                      query_images, segments)
 
                 metric.record(np.array(query_pred.argmax(dim=1)[0].cpu()),
                               np.array(query_labels[0].cpu()),
                               labels=label_ids, n_run=run)
+
 
             classIoU, meanIoU = metric.get_mIoU(labels=sorted(labels), n_run=run)
             classIoU_binary, meanIoU_binary = metric.get_mIoU_binary(n_run=run)

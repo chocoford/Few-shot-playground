@@ -19,7 +19,7 @@ from util.metric import Metric
 from util.visualizer import Visualizer
 from util.utils import set_seed, CLASS_LABELS, get_bbox
 from config import ex
-
+from skimage.segmentation import slic, mark_boundaries
 
 @ex.automain
 def main(_run, _config, _log):
@@ -115,12 +115,26 @@ def main(_run, _config, _log):
             query_labels = torch.cat(
                 [query_label.cuda()for query_label in sample_batched['query_labels']], dim=0)
 
+            if _config['superpixel_preSeg'] == True:
+                std= [0.229, 0.224, 0.225]
+                mean=[0.485, 0.456, 0.406]
+                query_image = torch.cat([query_image[0] for query_image in sample_batched['query_images']])
+                query_image[0] = query_image[0,:] * std[0] + mean[0]
+                query_image[1] = query_image[1,:] * std[1] + mean[1]
+                query_image[2] = query_image[2,:] * std[2] + mean[2]
+                image = query_image.permute(1,2,0).double().numpy()
+                segments = torch.from_numpy(slic(image, n_segments=500)) # [H, W]
+
+
             query_pred, _ = model(support_images, support_fg_mask, support_bg_mask,
-                                  query_images)
+                                  query_images, segments)
             # _log.info(f'shape of query_images: {query_images[0].shape}')
             query_images_t = [query_image_t.cuda()
                             for query_image_t in sample_batched['query_images_t']]
             # _log.info(f'shape of query_images_t: {query_images_t[0].shape}')
+
+
+            
 
             visualizer.visualize(query_images_t[0], query_pred, np.array(query_labels[0].cpu()), str(i), labels=label_ids)
                 

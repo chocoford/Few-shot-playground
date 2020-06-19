@@ -41,7 +41,7 @@ class FewShotSeg(nn.Module):
                 ('backbone', fpn), 
             ]))
 
-    def forward(self, supp_imgs, fore_mask, back_mask, qry_imgs):
+    def forward(self, supp_imgs, fore_mask, back_mask, qry_imgs, segments):
         """
         Args
         -------------
@@ -53,6 +53,8 @@ class FewShotSeg(nn.Module):
                 way x shot x [B x H x W], list of lists of tensors
             qry_imgs: query images
                 N x [B x 3 x H x W], list of tensors
+            qry_imgs: super piexel segment mask
+                N x [H x W], list of tensors
         Return
         ---------------
             query_pred: distance array 
@@ -112,8 +114,11 @@ class FewShotSeg(nn.Module):
                     dist = [self.calDist(query_fts, prototype, threshold=0.5)
                             for prototype in prototypes]
                 else:
-                    dist = [self.calDist(query_fts, prototype)
-                            for prototype in prototypes]
+                    qry_prototypes = self.getQrySuperPrototype(query_fts, segments)
+                    # print(f'line 118: each qry_prototype\'s shape: {qry_prototypes[0].shape}')
+                    dist = [F.cosine_similarity(torch.cat(qry_prototypes), prototype)
+                            for prototype in prototypes] # num_protoypes x [num_qry_prototypes]
+                    dist = [self.restorePredMask(pred, segments) for pred in dist]
                 pred = torch.stack(dist, dim=1)  # N x (1 + Wa) x H x W
                 outputs.append(pred)
             else:
@@ -281,3 +286,51 @@ class FewShotSeg(nn.Module):
                 loss = loss + F.cross_entropy(
                     supp_pred, supp_label[None, ...], ignore_index=255) / n_shots / n_ways
         return loss
+
+    def getQrySuperPrototype(self, qry_fts, segments):
+        """
+        根据超像素分割获得每个超像素的prototype
+
+        Parameters
+        ----------
+            qry_fts: features of query image, expected shape: [N, C, H, W]
+            segments: superpixel segmentation mask, expected shape: [H, W]
+
+        Return
+        ---------
+            prototypes: expected shape: n x [1, C]
+        """
+        ones = torch.ones(1).cuda()
+        zeros = torch.zeros(1).cuda()
+        n_segments = torch.max(segments) + 1
+        # print(f'num of segments: {n_segments}')
+        prototypes = []
+        for i in range(n_segments):
+            mask = torch.where(segments == i, ones, zeros)
+            prototype = self.getFeatures(qry_fts, mask[None, ...])
+            prototypes.append(prototype)
+        return prototypes
+
+    def restorePredMask(self, superpixel_pred, segments):
+        """
+        根据计算的超像素prototype相似度，还原预测掩模
+        Parameters:
+        -----------
+            superpixel_pred: expected shape: [num_qry_prototypes(i.e. n_segments)]
+            segments: superpixel segmentation mask, expected shape: [H, W]
+
+        Return:
+        -------
+            mask: expected shape: [H, W]
+        """
+        zeros = torch.zeros(1).cuda()
+        n_segments = torch.max(segments) + 1
+        prototypes = []
+        mask = torch.zeros_like(segments).cuda().float()
+        # print(f'mask: {mask}')
+        for i in range(n_segments):
+            mask += torch.where(segments == i, superpixel_pred[i], zeros)
+
+        # print(f'mask shape: {mask.shape}')
+        return mask[None, ...]
+

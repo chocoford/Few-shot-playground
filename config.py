@@ -51,7 +51,7 @@ def cfg():
             'cwa': False, # channel-wise average
             'cwwa': False, # channel-wise weighted average
             'no_pbg': False, # no background prototype
-            'us_first': False, # upsampling first then calculate distance.
+            'superpixel_preSeg': True, # upsampling first then calculate distance.
         }
 
         task = {
@@ -76,6 +76,8 @@ def cfg():
         bbox = False
         scribble = False
 
+        superpixel_preSeg = False
+        superpixel_preSeg_num = 100
         # Set dataset config from the snapshot string
         if 'VOC' in snapshot:
             dataset = 'VOC'
@@ -85,7 +87,9 @@ def cfg():
             raise ValueError('Wrong snapshot name !')
 
         # Set model config from the snapshot string
-        model = {}
+        model = {
+            'superpixel_preSeg': True
+        }
         for key in ['align', 'cwa', 'cwwa', 'no_pbg', 'us_first']:
             model[key] = key in snapshot
 
