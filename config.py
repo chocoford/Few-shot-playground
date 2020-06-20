@@ -32,15 +32,15 @@ def cfg():
     
     # playground
     encoder = "vgg"
-    theme = "be_nothing"
+    theme = "origin"
     
 
     if mode == 'train':
         dataset = 'VOC'  # 'VOC' or 'COCO'
-        n_steps = 30000
+        n_steps = 90000
         label_sets = 1
         batch_size = 1
-        lr_milestones = [10000, 20000, 30000]
+        lr_milestones = [10000, 20000, 30000, 90000]
         align_loss_scaler = 1
         ignore_label = 255
         print_interval = 100
@@ -111,7 +111,7 @@ def cfg():
 
     path = {
         'log_dir': f'./runs/{theme}',
-        'init_path': './pretrained_model/vgg16-397923af.pth',
+        'init_path': None,#'./pretrained_model/vgg16-397923af.pth',
         'VOC':{'data_dir': '../../Data/pascal-5i/',
                'data_split': 'trainaug',},
         'COCO':{'data_dir': '../../Data/COCO 2017/origin/trainval',

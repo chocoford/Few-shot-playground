@@ -100,33 +100,14 @@ class FewShotSeg(nn.Module):
                 supp_fg_fts, supp_bg_fts)
 
             ###### Compute the distance ######
-            if self.config['no_pbg']: 
-                prototypes = fg_prototypes
-            else:
-                prototypes = [bg_prototype, ] + fg_prototypes
-            
-            if self.config['superpixel_preSeg']:
-                # 先放大再比较
-                query_fts = F.interpolate(query_fts, size=img_size, mode='bilinear')
-                if self.config['no_pbg']:
-                    dist = [self.calDist(query_fts, prototype, threshold=0.5)
-                            for prototype in prototypes]
-                else:
-                    dist = [self.calDist(query_fts, prototype)
-                            for prototype in prototypes]
-                pred = torch.stack(dist, dim=1)  # N x (1 + Wa) x H x W
-                outputs.append(pred)
-            else:
-                dist = [self.calDist(query_fts, prototype)
-                        for prototype in prototypes]
-                pred = torch.stack(dist, dim=1)  # N x (1 + Wa) x H' x W'
-                if self.config['no_pbg']:
-                    zeros = torch.zeros_like(pred)
-                    pred = F.interpolate(pred, size=img_size, mode='bilinear')
-                    pred = torch.where(pred > 0.5, pred, zeros)
-                    outputs.append(pred)
-                else:
-                    outputs.append(F.interpolate(pred, size=img_size, mode='bilinear'))
+
+            prototypes = [bg_prototype, ] + fg_prototypes
+        
+            dist = [self.calDist(query_fts, prototype)
+                    for prototype in prototypes]
+            pred = torch.stack(dist, dim=1)  # N x (1 + Wa) x H' x W'
+    
+            outputs.append(F.interpolate(pred, size=img_size, mode='bilinear'))
             
                 
             ###### Prototype alignment loss ######
