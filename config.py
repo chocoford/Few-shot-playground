@@ -111,7 +111,7 @@ def cfg():
 
     path = {
         'log_dir': f'./runs/{theme}',
-        'init_path': None,#'./pretrained_model/vgg16-397923af.pth',
+        'init_path': './pretrained_model/vgg16-397923af.pth',
         'VOC':{'data_dir': '../../Data/pascal-5i/',
                'data_split': 'trainaug',},
         'COCO':{'data_dir': '../../Data/COCO 2017/origin/trainval',
