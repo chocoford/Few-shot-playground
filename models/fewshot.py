@@ -41,7 +41,7 @@ class FewShotSeg(nn.Module):
                 ('backbone', fpn), 
             ]))
 
-    def forward(self, supp_imgs, fore_mask, back_mask, qry_imgs):
+    def forward(self, supp_imgs, fore_mask, back_mask, qry_imgs, optimizer):
         """
         Args
         -------------
@@ -80,19 +80,52 @@ class FewShotSeg(nn.Module):
         back_mask = torch.stack([torch.stack(way, dim=0)
                                  for way in back_mask], dim=0)  # Wa x Sh x B x H' x W'
 
+        fore_mask =  nn.Parameter(fore_mask, requires_grad=True)
+        back_mask =  nn.Parameter(back_mask, requires_grad=True)
+
+        # epi = 0
+        # ###### Extract prototype 获得公式1、2中右半边的值######
+        # supp_fg_fts = [
+        #     [self.getFeatures(supp_fts[way, shot, [epi]], fore_mask[way, shot, [
+        #                         epi]]) for shot in range(n_shots)]
+        #     for way in range(n_ways)
+        # ]
+        # supp_bg_fts = [[self.getFeatures(supp_fts[way, shot, [epi]],
+        #                                     back_mask[way, shot, [epi]])
+        #                 for shot in range(n_shots)] for way in range(n_ways)]
+
+        # ###### Obtain the prototypes######
+        # fg_prototypes, bg_prototype = self.getPrototype(
+        #     supp_fg_fts, supp_bg_fts)
+
+        # ###### Compute the distance ######
+        # prototypes = [bg_prototype, ] + fg_prototypes
+    
+        # #临时[0]
+        # mask_loss = self.maskLoss(supp_fts[0, :, epi], prototypes, fore_mask[:, 0, epi])
+        # mask_loss.backward()
+        # optimizer.step()
+
+        # supp_fts = img_fts[:n_ways * n_shots * batch_size].view(
+        #     n_ways, n_shots, batch_size, -1, *fts_size)  # Wa x Sh x B x C x H' x W'
+        # qry_fts = img_fts[n_ways * n_shots * batch_size:].view(
+        #     n_queries, batch_size, -1, *fts_size)   # N x B x C x H' x W'
+
+
         ###### Compute loss ######
         align_loss = 0
         outputs = []
         for epi in range(batch_size):
             query_fts = qry_fts[:, epi]
+
             ###### Extract prototype 获得公式1、2中右半边的值######
             supp_fg_fts = [
                 [self.getFeatures(supp_fts[way, shot, [epi]], fore_mask[way, shot, [
-                                  epi]]) for shot in range(n_shots)]
+                                    epi]]) for shot in range(n_shots)]
                 for way in range(n_ways)
             ]
             supp_bg_fts = [[self.getFeatures(supp_fts[way, shot, [epi]],
-                                             back_mask[way, shot, [epi]])
+                                                back_mask[way, shot, [epi]])
                             for shot in range(n_shots)] for way in range(n_ways)]
 
             ###### Obtain the prototypes######
@@ -100,9 +133,38 @@ class FewShotSeg(nn.Module):
                 supp_fg_fts, supp_bg_fts)
 
             ###### Compute the distance ######
+            prototypes = [bg_prototype, ] + fg_prototypes
+        
+            #临时[0]
+            mask_loss = self.maskLoss(supp_fts[0, :, epi], prototypes, fore_mask[:, 0, epi])
+            mask_loss.backward()
+            with torch.no_grad():
+                fore_mask -= 0.001 * fore_mask.grad
+                back_mask -= 0.001 * back_mask.grad
+
+                # Manually zero the gradients after updating weights
+                fore_mask.grad.zero_()
+                back_mask.grad.zero_()
+                self.encoder.zero_grad()
+            # optimizer.step()
+
+            ###### again ######
+            supp_fg_fts = [
+                [self.getFeatures(supp_fts[way, shot, [epi]], fore_mask[way, shot, [
+                                    epi]]) for shot in range(n_shots)]
+                for way in range(n_ways)
+            ]
+            supp_bg_fts = [[self.getFeatures(supp_fts[way, shot, [epi]],
+                                                back_mask[way, shot, [epi]])
+                            for shot in range(n_shots)] for way in range(n_ways)]
+
+            fg_prototypes, bg_prototype = self.getPrototype(
+                supp_fg_fts, supp_bg_fts)
 
             prototypes = [bg_prototype, ] + fg_prototypes
         
+
+
             dist = [self.calDist(query_fts, prototype)
                     for prototype in prototypes]
             pred = torch.stack(dist, dim=1)  # N x (1 + Wa) x H' x W'
@@ -118,7 +180,7 @@ class FewShotSeg(nn.Module):
 
         output = torch.stack(outputs, dim=1)  # N x B x (1 + Wa) x H x W
         output = output.view(-1, *output.shape[2:])
-        return output, align_loss / batch_size
+        return output, align_loss / batch_size, mask_loss
 
     def calDist(self, fts, prototype, threshold=None, scaler=20):
         """
@@ -143,6 +205,26 @@ class FewShotSeg(nn.Module):
             dist = torch.where(dist > 0.5, dist, zeros)
         return dist
 
+    def get(self, supp_fts, fore_mask, back_mask, n_ways, n_shots, epi):
+        ###### Extract prototype 获得公式1、2中右半边的值######
+        supp_fg_fts = [
+            [self.getFeatures(supp_fts[way, shot, [epi]], fore_mask[way, shot, [
+                                epi]]) for shot in range(n_shots)]
+            for way in range(n_ways)
+        ]
+        supp_bg_fts = [[self.getFeatures(supp_fts[way, shot, [epi]],
+                                            back_mask[way, shot, [epi]])
+                        for shot in range(n_shots)] for way in range(n_ways)]
+
+        ###### Obtain the prototypes######
+        fg_prototypes, bg_prototype = self.getPrototype(
+            supp_fg_fts, supp_bg_fts)
+
+        ###### Compute the distance ######
+
+        prototypes = [bg_prototype, ] + fg_prototypes
+        
+        return prototypes
 
     def getFeatures(self, fts, mask):
         """
@@ -154,23 +236,8 @@ class FewShotSeg(nn.Module):
         """
         fts = F.interpolate(
             fts, size=mask.shape[-2:], mode='bilinear')  # 采样到与mask一样的大小
-
-        # playground
-        if self.config['cwa']:
-            valid_fts = fts * mask[None, ...]
-            ones = torch.ones_like(valid_fts)
-            zeros = torch.zeros_like(valid_fts)
-            masked_fts = torch.sum(valid_fts, dim=(2, 3)) \
-            / (mask[None, ...].sum(dim=(2, 3)).repeat(fts.shape[:2]) \
-            + torch.where(valid_fts > 0, ones, zeros).sum(dim=(2,3)) + 1e-5)
-        elif self.config['cwwa']: 
-            masked_fts = torch.sum(fts * mask[None, ...], dim=(2, 3)) \
-            / (mask[None, ...].sum(dim=(2, 3)) + 1e-5)
-        
-        # 把整个输入变成一个向量
-        else:
-            masked_fts = torch.sum(fts * mask[None, ...], dim=(2, 3)) \
-                / (mask[None, ...].sum(dim=(2, 3)) + 1e-5)  # 1 x C
+        masked_fts = torch.sum(fts * mask[None, ...], dim=(2, 3)) \
+            / (mask[None, ...].sum(dim=(2, 3)) + 1e-5)  # 1 x C
         return masked_fts
 
     def getPrototype(self, fg_fts, bg_fts):
@@ -261,4 +328,13 @@ class FewShotSeg(nn.Module):
                 # Compute Loss
                 loss = loss + F.cross_entropy(
                     supp_pred, supp_label[None, ...], ignore_index=255) / n_shots / n_ways
+        return loss
+
+    def maskLoss(self, support_fts, prototypes, fore_mask):    
+        img_size = fore_mask.shape[-2:]
+        dist = [self.calDist(support_fts, prototype)
+                for prototype in prototypes]
+        pred = torch.stack(dist, dim=1)  # N x (1 + Wa) x H' x W'
+        pred = F.interpolate(pred, size=img_size, mode='bilinear', align_corners=False)
+        loss = F.cross_entropy(pred, fore_mask.long(), ignore_index=255)
         return loss

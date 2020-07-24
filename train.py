@@ -126,10 +126,10 @@ def main(_run, _config, _log):
 
         # Forward and Backward
         optimizer.zero_grad()
-        query_pred, align_loss = model(support_images, support_fg_mask, support_bg_mask,
-                                       query_images)
+        query_pred, align_loss, mask_loss = model(support_images, support_fg_mask, support_bg_mask,
+                                       query_images, optimizer)
         query_loss = criterion(query_pred, query_labels)
-        loss = query_loss + align_loss * _config['align_loss_scaler']
+        loss = query_loss + align_loss * _config['align_loss_scaler'] + mask_loss
         loss.backward()
         optimizer.step()
         scheduler.step()

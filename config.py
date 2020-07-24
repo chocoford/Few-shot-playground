@@ -32,15 +32,15 @@ def cfg():
     
     # playground
     encoder = "vgg"
-    theme = "origin"
+    theme = "weighted_mask"
     
 
     if mode == 'train':
         dataset = 'VOC'  # 'VOC' or 'COCO'
-        n_steps = 90000
+        n_steps = 50000
         label_sets = 1
         batch_size = 1
-        lr_milestones = [10000, 20000, 30000, 90000]
+        lr_milestones = [10000, 20000, 30000, 50000]
         align_loss_scaler = 1
         ignore_label = 255
         print_interval = 100
