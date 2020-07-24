@@ -67,7 +67,8 @@ class FewShotSeg(nn.Module):
         ###### Extract features ######
         imgs_concat = torch.cat([torch.cat(
             way, dim=0) for way in supp_imgs] + [torch.cat(qry_imgs, dim=0), ], dim=0)
-        img_fts = self.encoder(imgs_concat)
+        with torch.no_grad():
+            img_fts = self.encoder(imgs_concat)
         fts_size = img_fts.shape[-2:]  # [W, H]
 
         supp_fts = img_fts[:n_ways * n_shots * batch_size].view(
@@ -94,7 +95,7 @@ class FewShotSeg(nn.Module):
         #                                     back_mask[way, shot, [epi]])
         #                 for shot in range(n_shots)] for way in range(n_ways)]
 
-        # ###### Obtain the prototypes######
+        # ###### Obtain the prototypes ######
         # fg_prototypes, bg_prototype = self.getPrototype(
         #     supp_fg_fts, supp_bg_fts)
 
@@ -118,7 +119,7 @@ class FewShotSeg(nn.Module):
         for epi in range(batch_size):
             query_fts = qry_fts[:, epi]
 
-            ###### Extract prototype 获得公式1、2中右半边的值######
+            ###### Extract prototype 获得公式1、2中右半边的值 ######
             supp_fg_fts = [
                 [self.getFeatures(supp_fts[way, shot, [epi]], fore_mask[way, shot, [
                                     epi]]) for shot in range(n_shots)]
@@ -149,6 +150,11 @@ class FewShotSeg(nn.Module):
             # optimizer.step()
 
             ###### again ######
+            img_fts = self.encoder(imgs_concat)
+            supp_fts = img_fts[:n_ways * n_shots * batch_size].view(
+                n_ways, n_shots, batch_size, -1, *fts_size)  # Wa x Sh x B x C x H' x W'
+            qry_fts = img_fts[n_ways * n_shots * batch_size:].view(
+                n_queries, batch_size, -1, *fts_size)   # N x B x C x H' x W'
             supp_fg_fts = [
                 [self.getFeatures(supp_fts[way, shot, [epi]], fore_mask[way, shot, [
                                     epi]]) for shot in range(n_shots)]
