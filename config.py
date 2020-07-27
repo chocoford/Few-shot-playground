@@ -29,9 +29,6 @@ def cfg():
     cuda_visable = '0, 1, 2, 3, 4, 5, 6, 7'
     gpu_id = 0
     mode = 'test' # 'train' or 'test'
-    
-    # playground
-    encoder = "vgg"
     theme = "weighted_mask"
     
 

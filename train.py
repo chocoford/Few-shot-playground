@@ -40,7 +40,7 @@ def main(_run, _config, _log):
 
     _log.info('###### Create model ######')
     model = FewShotSeg(
-        pretrained_path=_config['path']['init_path'], cfg=_config['model'], encoder=_config['encoder'])
+        pretrained_path=_config['path']['init_path'], cfg=_config['model'])
     model = nn.DataParallel(model.cuda(), device_ids=[_config['gpu_id'], ])
 
     _log.info('###### Load data ######')
@@ -126,10 +126,10 @@ def main(_run, _config, _log):
 
         # Forward and Backward
         optimizer.zero_grad()
-        query_pred, align_loss, mask_loss = model(support_images, support_fg_mask, support_bg_mask,
+        query_pred, align_loss = model(support_images, support_fg_mask, support_bg_mask,
                                        query_images, optimizer)
         query_loss = criterion(query_pred, query_labels)
-        loss = query_loss + align_loss * _config['align_loss_scaler'] + mask_loss
+        loss = query_loss + align_loss * _config['align_loss_scaler']
         loss.backward()
         optimizer.step()
         scheduler.step()

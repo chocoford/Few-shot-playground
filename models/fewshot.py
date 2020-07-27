@@ -25,23 +25,17 @@ class FewShotSeg(nn.Module):
             model configurations
     """
 
-    def __init__(self, in_channels=3, pretrained_path=None, cfg=None, encoder="vgg"):
+    def __init__(self, in_channels=3, pretrained_path=None, cfg=None):
         super().__init__()
         self.pretrained_path = pretrained_path
         self.config = cfg or {'align': False}
+        self.mask_optimize_step = 5
 
-        if encoder == "vgg":
-            # Encoder: VGG-16
-            self.encoder = nn.Sequential(OrderedDict([
-                ('backbone', Encoder(in_channels, self.pretrained_path)), ]))
-        elif encoder == "fpn" :
-            fpn = resnet()
-            fpn.create_architecture()
-            self.encoder = nn.Sequential(OrderedDict([
-                ('backbone', fpn), 
-            ]))
+        # Encoder: VGG-16
+        self.encoder = nn.Sequential(OrderedDict([
+            ('backbone', Encoder(in_channels, self.pretrained_path)), ]))
 
-    def forward(self, supp_imgs, fore_mask, back_mask, qry_imgs, optimizer):
+    def forward(self, supp_imgs, fore_mask, back_mask, qry_imgs):
         """
         Args
         -------------
@@ -67,8 +61,8 @@ class FewShotSeg(nn.Module):
         ###### Extract features ######
         imgs_concat = torch.cat([torch.cat(
             way, dim=0) for way in supp_imgs] + [torch.cat(qry_imgs, dim=0), ], dim=0)
-        with torch.no_grad():
-            img_fts = self.encoder(imgs_concat)
+        
+        img_fts = self.encoder(imgs_concat)
         fts_size = img_fts.shape[-2:]  # [W, H]
 
         supp_fts = img_fts[:n_ways * n_shots * batch_size].view(
@@ -83,34 +77,6 @@ class FewShotSeg(nn.Module):
 
         fore_mask =  nn.Parameter(fore_mask, requires_grad=True)
         back_mask =  nn.Parameter(back_mask, requires_grad=True)
-
-        # epi = 0
-        # ###### Extract prototype 获得公式1、2中右半边的值######
-        # supp_fg_fts = [
-        #     [self.getFeatures(supp_fts[way, shot, [epi]], fore_mask[way, shot, [
-        #                         epi]]) for shot in range(n_shots)]
-        #     for way in range(n_ways)
-        # ]
-        # supp_bg_fts = [[self.getFeatures(supp_fts[way, shot, [epi]],
-        #                                     back_mask[way, shot, [epi]])
-        #                 for shot in range(n_shots)] for way in range(n_ways)]
-
-        # ###### Obtain the prototypes ######
-        # fg_prototypes, bg_prototype = self.getPrototype(
-        #     supp_fg_fts, supp_bg_fts)
-
-        # ###### Compute the distance ######
-        # prototypes = [bg_prototype, ] + fg_prototypes
-    
-        # #临时[0]
-        # mask_loss = self.maskLoss(supp_fts[0, :, epi], prototypes, fore_mask[:, 0, epi])
-        # mask_loss.backward()
-        # optimizer.step()
-
-        # supp_fts = img_fts[:n_ways * n_shots * batch_size].view(
-        #     n_ways, n_shots, batch_size, -1, *fts_size)  # Wa x Sh x B x C x H' x W'
-        # qry_fts = img_fts[n_ways * n_shots * batch_size:].view(
-        #     n_queries, batch_size, -1, *fts_size)   # N x B x C x H' x W'
 
 
         ###### Compute loss ######
@@ -137,39 +103,23 @@ class FewShotSeg(nn.Module):
             prototypes = [bg_prototype, ] + fg_prototypes
         
             #临时[0]
-            mask_loss = self.maskLoss(supp_fts[0, :, epi], prototypes, fore_mask[:, 0, epi])
-            mask_loss.backward()
-            with torch.no_grad():
-                fore_mask -= 0.001 * fore_mask.grad
-                back_mask -= 0.001 * back_mask.grad
+            for _ in range(self.mask_optimize_step):
+                self.optimizeMask(supp_fts, prototypes, fore_mask, back_mask)
+            # self.encoder.requires_grad_(requires_grad=False)
+            # mask_loss = self.maskLoss(supp_fts[0, :, epi], prototypes, fore_mask[:, 0, epi])
+            # mask_loss.backward(retain_graph=True)
+            # with torch.no_grad():
+            #     fore_mask -= 0.01 * fore_mask.grad
+            #     back_mask -= 0.01 * back_mask.grad
 
-                # Manually zero the gradients after updating weights
-                fore_mask.grad.zero_()
-                back_mask.grad.zero_()
-                self.encoder.zero_grad()
-            # optimizer.step()
-
-            ###### again ######
-            img_fts = self.encoder(imgs_concat)
-            supp_fts = img_fts[:n_ways * n_shots * batch_size].view(
-                n_ways, n_shots, batch_size, -1, *fts_size)  # Wa x Sh x B x C x H' x W'
-            qry_fts = img_fts[n_ways * n_shots * batch_size:].view(
-                n_queries, batch_size, -1, *fts_size)   # N x B x C x H' x W'
-            supp_fg_fts = [
-                [self.getFeatures(supp_fts[way, shot, [epi]], fore_mask[way, shot, [
-                                    epi]]) for shot in range(n_shots)]
-                for way in range(n_ways)
-            ]
-            supp_bg_fts = [[self.getFeatures(supp_fts[way, shot, [epi]],
-                                                back_mask[way, shot, [epi]])
-                            for shot in range(n_shots)] for way in range(n_ways)]
-
-            fg_prototypes, bg_prototype = self.getPrototype(
-                supp_fg_fts, supp_bg_fts)
-
-            prototypes = [bg_prototype, ] + fg_prototypes
-        
-
+            #     # Manually zero the gradients after updating weights
+            #     fore_mask.grad.zero_()
+            #     back_mask.grad.zero_()
+            #     fore_mask.requires_grad_(False)
+            #     back_mask.requires_grad_(False)
+            #     self.encoder.zero_grad()
+            
+            # self.encoder.requires_grad_(requires_grad=True)
 
             dist = [self.calDist(query_fts, prototype)
                     for prototype in prototypes]
@@ -186,7 +136,7 @@ class FewShotSeg(nn.Module):
 
         output = torch.stack(outputs, dim=1)  # N x B x (1 + Wa) x H x W
         output = output.view(-1, *output.shape[2:])
-        return output, align_loss / batch_size, mask_loss
+        return output, align_loss / batch_size
 
     def calDist(self, fts, prototype, threshold=None, scaler=20):
         """
@@ -210,27 +160,6 @@ class FewShotSeg(nn.Module):
             zeros = torch.zeros_like(dist)
             dist = torch.where(dist > 0.5, dist, zeros)
         return dist
-
-    def get(self, supp_fts, fore_mask, back_mask, n_ways, n_shots, epi):
-        ###### Extract prototype 获得公式1、2中右半边的值######
-        supp_fg_fts = [
-            [self.getFeatures(supp_fts[way, shot, [epi]], fore_mask[way, shot, [
-                                epi]]) for shot in range(n_shots)]
-            for way in range(n_ways)
-        ]
-        supp_bg_fts = [[self.getFeatures(supp_fts[way, shot, [epi]],
-                                            back_mask[way, shot, [epi]])
-                        for shot in range(n_shots)] for way in range(n_ways)]
-
-        ###### Obtain the prototypes######
-        fg_prototypes, bg_prototype = self.getPrototype(
-            supp_fg_fts, supp_bg_fts)
-
-        ###### Compute the distance ######
-
-        prototypes = [bg_prototype, ] + fg_prototypes
-        
-        return prototypes
 
     def getFeatures(self, fts, mask):
         """
@@ -335,6 +264,24 @@ class FewShotSeg(nn.Module):
                 loss = loss + F.cross_entropy(
                     supp_pred, supp_label[None, ...], ignore_index=255) / n_shots / n_ways
         return loss
+
+    def optimizeMask(self, supp_fts, prototypes, fore_mask, back_mask):
+        #临时[0]
+        self.encoder.requires_grad_(requires_grad=False)
+        mask_loss = self.maskLoss(supp_fts[0, :, 0], prototypes, fore_mask[:, 0, 0])
+        mask_loss.backward(retain_graph=True)
+        with torch.no_grad():
+            fore_mask -= 0.01 * fore_mask.grad
+            back_mask -= 0.01 * back_mask.grad
+
+            # Manually zero the gradients after updating weights
+            fore_mask.grad.zero_()
+            back_mask.grad.zero_()
+            fore_mask.requires_grad_(False)
+            back_mask.requires_grad_(False)
+            self.encoder.zero_grad()
+        self.encoder.requires_grad_(requires_grad=True)
+
 
     def maskLoss(self, support_fts, prototypes, fore_mask):    
         img_size = fore_mask.shape[-2:]
