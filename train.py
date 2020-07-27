@@ -107,6 +107,8 @@ def main(_run, _config, _log):
     log_loss = {'loss': 0, 'align_loss': 0, 'val_loss': 0}
     train_losses = []
     align_losses = []
+    avg_train_losses = []
+    avg_align_losses = []
     val_losses = []
     _log.info('###### Training ######')
     for i_iter, sample_batched in enumerate(train_dl):
@@ -141,8 +143,10 @@ def main(_run, _config, _log):
         _run.log_scalar('align_loss', align_loss)
         log_loss['loss'] += query_loss
         log_loss['align_loss'] += align_loss
-        train_losses.append(log_loss['loss'] / (i_iter + 1))
-        align_losses.append(log_loss['align_loss'] / (i_iter + 1))
+        train_losses.append(query_loss)
+        align_losses.append(align_loss)
+        avg_train_losses.append(log_loss['loss'] / (i_iter + 1))
+        avg_align_losses.append(log_loss['align_loss'] / (i_iter + 1))
 
         # val loss
         # model.eval()
@@ -158,9 +162,9 @@ def main(_run, _config, _log):
 
         # print loss and take snapshots
         if (i_iter + 1) % _config['print_interval'] == 0:
-            loss = log_loss['loss'] / (i_iter + 1)
-            align_loss = log_loss['align_loss'] / (i_iter + 1)
-            print(f'step {i_iter+1}: loss: {loss}, align_loss: {align_loss}')
+            avg_loss = log_loss['loss'] / (i_iter + 1)
+            avg_align_loss = log_loss['align_loss'] / (i_iter + 1)
+            print(f'step {i_iter+1}: loss: {query_loss}, align_loss: {align_loss}, avg_loss: {avg_loss}, avg_align_loss: {avg_align_loss}')
 
         if (i_iter + 1) % _config['save_pred_every'] == 0:
             _log.info('###### Taking snapshot ######')
@@ -176,10 +180,13 @@ def main(_run, _config, _log):
     fig, ax = plt.subplots()
     # ax.plot(x, val_losses, label='val loss') 
     ax.plot(x, train_losses, label='train loss')
-    ax.plot(x, align_losses, label='align loss')
+    ax.plot(x, avg_train_losses, label='average train loss')
+    if _config['model']['align'] == True: 
+        ax.plot(x, align_losses, label='align loss') 
+        ax.plot(x, avg_align_losses, label='average align loss')
     ax.set_xlabel('iteration')  
     ax.set_ylabel('loss') 
-    ax.set_title("损失")
+    ax.set_title("训练损失")
     ax.legend() 
     
     plt.savefig(f'{_run.observers[0].dir}/loss.png')
