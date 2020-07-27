@@ -30,6 +30,7 @@ class FewShotSeg(nn.Module):
         self.pretrained_path = pretrained_path
         self.config = cfg or {'align': False}
         self.mask_optimize_step = 5
+        self.mask_optimize_lr = 1e-3
 
         # Encoder: VGG-16
         self.encoder = nn.Sequential(OrderedDict([
@@ -101,31 +102,18 @@ class FewShotSeg(nn.Module):
 
             ###### Compute the distance ######
             prototypes = [bg_prototype, ] + fg_prototypes
-        
-            #临时[0]
+
+            self.encoder.requires_grad_(requires_grad=False)
             for _ in range(self.mask_optimize_step):
                 self.optimizeMask(supp_fts, prototypes, fore_mask, back_mask)
-            # self.encoder.requires_grad_(requires_grad=False)
-            # mask_loss = self.maskLoss(supp_fts[0, :, epi], prototypes, fore_mask[:, 0, epi])
-            # mask_loss.backward(retain_graph=True)
-            # with torch.no_grad():
-            #     fore_mask -= 0.01 * fore_mask.grad
-            #     back_mask -= 0.01 * back_mask.grad
+            self.encoder.requires_grad_(requires_grad=True)
 
-            #     # Manually zero the gradients after updating weights
-            #     fore_mask.grad.zero_()
-            #     back_mask.grad.zero_()
-            #     fore_mask.requires_grad_(False)
-            #     back_mask.requires_grad_(False)
-            #     self.encoder.zero_grad()
-            
-            # self.encoder.requires_grad_(requires_grad=True)
-
+                
             dist = [self.calDist(query_fts, prototype)
                     for prototype in prototypes]
             pred = torch.stack(dist, dim=1)  # N x (1 + Wa) x H' x W'
     
-            outputs.append(F.interpolate(pred, size=img_size, mode='bilinear'))
+            outputs.append(F.interpolate(pred, size=img_size, mode='bilinear', align_corners=True))
             
                 
             ###### Prototype alignment loss ######
@@ -170,7 +158,7 @@ class FewShotSeg(nn.Module):
             mask: binary mask, expect shape: 1 x H x W
         """
         fts = F.interpolate(
-            fts, size=mask.shape[-2:], mode='bilinear')  # 采样到与mask一样的大小
+            fts, size=mask.shape[-2:], mode='bilinear', align_corners=True)  # 采样到与mask一样的大小
         masked_fts = torch.sum(fts * mask[None, ...], dim=(2, 3)) \
             / (mask[None, ...].sum(dim=(2, 3)) + 1e-5)  # 1 x C
         return masked_fts
@@ -241,7 +229,7 @@ class FewShotSeg(nn.Module):
             for shot in range(n_shots):
                 img_fts = supp_fts[way, [shot]]
                 if self.config['us_first']:
-                    img_fts = F.interpolate(img_fts, size=fore_mask.shape[-2:], mode='bilinear')
+                    img_fts = F.interpolate(img_fts, size=fore_mask.shape[-2:], mode='bilinear', align_corners=True)
                     if self.config['no_pbg']:
                         supp_dist = [self.calDist(img_fts, prototype, threshold=0.5)
                                     for prototype in prototypes]
@@ -254,7 +242,7 @@ class FewShotSeg(nn.Module):
                                 for prototype in prototypes]
                     supp_pred = torch.stack(supp_dist, dim=1)
                     supp_pred = F.interpolate(supp_pred, size=fore_mask.shape[-2:],
-                                            mode='bilinear')
+                                            mode='bilinear', align_corners=True)
                 # Construct the support Ground-Truth segmentation
                 supp_label = torch.full_like(fore_mask[way, shot], 255,
                                              device=img_fts.device).long()
@@ -267,20 +255,16 @@ class FewShotSeg(nn.Module):
 
     def optimizeMask(self, supp_fts, prototypes, fore_mask, back_mask):
         #临时[0]
-        self.encoder.requires_grad_(requires_grad=False)
         mask_loss = self.maskLoss(supp_fts[0, :, 0], prototypes, fore_mask[:, 0, 0])
         mask_loss.backward(retain_graph=True)
         with torch.no_grad():
-            fore_mask -= 0.01 * fore_mask.grad
-            back_mask -= 0.01 * back_mask.grad
+            fore_mask -= self.mask_optimize_lr * fore_mask.grad
+            back_mask -= self.mask_optimize_lr * back_mask.grad
 
             # Manually zero the gradients after updating weights
             fore_mask.grad.zero_()
             back_mask.grad.zero_()
-            fore_mask.requires_grad_(False)
-            back_mask.requires_grad_(False)
             self.encoder.zero_grad()
-        self.encoder.requires_grad_(requires_grad=True)
 
 
     def maskLoss(self, support_fts, prototypes, fore_mask):    
@@ -288,6 +272,6 @@ class FewShotSeg(nn.Module):
         dist = [self.calDist(support_fts, prototype)
                 for prototype in prototypes]
         pred = torch.stack(dist, dim=1)  # N x (1 + Wa) x H' x W'
-        pred = F.interpolate(pred, size=img_size, mode='bilinear', align_corners=False)
+        pred = F.interpolate(pred, size=img_size, mode='bilinear', align_corners=True)
         loss = F.cross_entropy(pred, fore_mask.long(), ignore_index=255)
         return loss
