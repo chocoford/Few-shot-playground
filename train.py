@@ -180,16 +180,14 @@ def main(_run, _config, _log):
     
     import matplotlib.pyplot as plt
     x = [i for i in range(1, len(train_losses)+1)]
-    fig, ax = plt.subplots()
-    # ax.plot(x, val_losses, label='val loss') 
-    ax.plot(x, train_losses, label='train loss')
-    ax.plot(x, avg_train_losses, label='average train loss')
+    fig = plt.figure(figsize=(38.4,21.6))
+    fig.plot(x, train_losses, label='train loss')
+    fig.plot(x, avg_train_losses, label='average train loss')
     if _config['model']['align'] == True: 
-        ax.plot(x, align_losses, label='align loss') 
-        ax.plot(x, avg_align_losses, label='average align loss')
-    ax.set_xlabel('iteration')  
-    ax.set_ylabel('loss') 
-    ax.set_title("训练损失")
-    ax.legend() 
-    
+        fig.plot(x, align_losses, label='align loss') 
+        fig.plot(x, avg_align_losses, label='average align loss')
+    plt.xlabel('iteration')
+    plt.ylabel('loss')
+    plt.title("training loss")
+    plt.legend()
     plt.savefig(f'{_run.observers[0].dir}/loss.png')
