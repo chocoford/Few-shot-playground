@@ -167,7 +167,7 @@ def main(_run, _config, _log):
             if _config['model']['align'] == True: 
                 print(f'step {i_iter+1}: loss: {query_loss}, align_loss: {align_loss}, avg_loss: {avg_loss}, avg_align_loss: {avg_align_loss}')
             else:
-                print(f'step {i_iter+1}: loss: {query_loss}, avg_loss: {avg_loss})
+                print(f'step {i_iter+1}: loss: {query_loss}, avg_loss: {avg_loss}')
 
         if (i_iter + 1) % _config['save_pred_every'] == 0:
             _log.info('###### Taking snapshot ######')
