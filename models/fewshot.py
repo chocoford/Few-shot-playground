@@ -30,16 +30,16 @@ class FewShotSeg(nn.Module):
         self.pretrained_path = pretrained_path
         self.config = cfg or {'align': False}
 
-        if encoder == "vgg":
-            # Encoder: VGG-16
-            self.encoder = nn.Sequential(OrderedDict([
-                ('backbone', Encoder(in_channels, self.pretrained_path)), ]))
-        elif encoder == "fpn" :
-            fpn = resnet()
-            fpn.create_architecture()
-            self.encoder = nn.Sequential(OrderedDict([
-                ('backbone', fpn), 
-            ]))
+        # Encoder: VGG-16
+        self.encoder = nn.Sequential(OrderedDict([
+            ('backbone', Encoder(in_channels, self.pretrained_path)), ]))
+
+        self.cat_layer = nn.Sequential(
+            nn.Conv2d(in_channels=256 * 2, out_channels=256, kernel_size=3, stride=1, padding=2, dilation=2,
+                      bias=True),
+            nn.ReLU(),
+            nn.Dropout2d(p=0.5))
+
 
     def forward(self, supp_imgs, fore_mask, back_mask, qry_imgs):
         """
@@ -101,7 +101,8 @@ class FewShotSeg(nn.Module):
 
 
             fg_prototypes = fg_prototypes[0].expand(-1, -1, fts_size[0], fts_size[1])  # tile for cat
-            out = torch.cat([qry_fts[:, 0], fg_prototypes],dim=1)
+            out = torch.cat([qry_fts[:, 0], fg_prototypes], dim=1)
+
             ###### Compute the distance ######
 
             prototypes = [bg_prototype, ] + fg_prototypes
