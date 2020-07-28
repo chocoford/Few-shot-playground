@@ -13,5 +13,5 @@ if __name__ == '__main__':
     #     p.numel() for p in model.parameters() if p.requires_grad)
     # print(f'{total_trainable_params:,} training parameters.')
 
-    model = FewShotSeg(pretrained_path='./runs/weighted_mask/PANet_VOC_sets_0_1way_1shot_[train]/8/snapshots/30000.pth')
+    model = FewShotSeg(pretrained_path='./runs/weighted_mask/PANet_VOC_sets_0_1way_1shot_[train]/1/snapshots/30000.pth')
     print(model.state_dict)
