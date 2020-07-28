@@ -99,10 +99,13 @@ class FewShotSeg(nn.Module):
             fg_prototypes, bg_prototype = self.getPrototype(
                 supp_fg_fts, supp_bg_fts)
 
+
+            fg_prototypes = fg_prototypes[0].expand(-1, -1, fts_size[0], fts_size[1])  # tile for cat
+            out = torch.cat([qry_fts[:, 0], fg_prototypes],dim=1)
             ###### Compute the distance ######
 
             prototypes = [bg_prototype, ] + fg_prototypes
-        
+
             dist = [self.calDist(query_fts, prototype)
                     for prototype in prototypes]
             pred = torch.stack(dist, dim=1)  # N x (1 + Wa) x H' x W'
