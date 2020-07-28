@@ -188,6 +188,6 @@ def main(_run, _config, _log):
         fig.plot(x, avg_align_losses, label='average align loss')
     plt.xlabel('iteration')
     plt.ylabel('loss')
-    plt.title("训练损失")
+    plt.title("training loss")
     plt.legend()
     plt.savefig(f'{_run.observers[0].dir}/loss.png')
