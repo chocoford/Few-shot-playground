@@ -28,7 +28,7 @@ class Encoder(nn.Module):
             nn.MaxPool2d(kernel_size=3, stride=2, padding=1),
             self._make_layer(3, 256, 512),
             nn.MaxPool2d(kernel_size=3, stride=1, padding=1),
-            self._make_layer(3, 512, 512, dilation=2, lastRelu=False),
+            self._make_layer(3, 512, 512, dilation=2, lastRelu=True),
         )
 
         self._init_weights()

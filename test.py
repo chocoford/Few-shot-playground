@@ -128,7 +128,7 @@ def main(_run, _config, _log):
 
 
                 # [1, 2, 417, 417]
-                query_pred, _ = model(support_images, support_fg_mask, support_bg_mask,
+                query_pred = model(support_images, support_fg_mask, support_bg_mask,
                                       query_images)
 
                 metric.record(np.array(query_pred.argmax(dim=1)[0].cpu()),

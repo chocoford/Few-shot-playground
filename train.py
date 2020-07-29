@@ -16,6 +16,7 @@ from models.resnet import resnet
 from dataloaders.customized import voc_fewshot, coco_fewshot
 from dataloaders.transforms import RandomMirror, Resize, ToTensorNormalize
 from util.utils import set_seed, CLASS_LABELS
+from util.loss import entropy_loss
 from config import ex
 
   
@@ -128,25 +129,28 @@ def main(_run, _config, _log):
 
         # Forward and Backward
         optimizer.zero_grad()
-        query_pred, align_loss = model(support_images, support_fg_mask, support_bg_mask,
+        query_pred = model(support_images, support_fg_mask, support_bg_mask,
                                        query_images)
         query_loss = criterion(query_pred, query_labels)
-        loss = query_loss + align_loss * _config['align_loss_scaler']
+        loss = query_loss 
+        # with torch.no_grad():
+        #     print(f'query_loss: {query_loss}, entropy_loss: {entropy_loss(query_pred)}')
+        #     print(query_pred[0].nonzero().shape)
         loss.backward()
         optimizer.step()
         scheduler.step()
 
         # Log loss
         query_loss = query_loss.detach().data.cpu().numpy()
-        align_loss = align_loss.detach().data.cpu().numpy() if align_loss != 0 else 0
+        # align_loss = align_loss.detach().data.cpu().numpy() if align_loss != 0 else 0
         _run.log_scalar('loss', query_loss)
-        _run.log_scalar('align_loss', align_loss)
+        # _run.log_scalar('align_loss', align_loss)
         log_loss['loss'] += query_loss
-        log_loss['align_loss'] += align_loss
+        # log_loss['align_loss'] += align_loss
         train_losses.append(query_loss)
-        align_losses.append(align_loss)
+        # align_losses.append(align_loss)
         avg_train_losses.append(log_loss['loss'] / (i_iter + 1))
-        avg_align_losses.append(log_loss['align_loss'] / (i_iter + 1))
+        # avg_align_losses.append(log_loss['align_loss'] / (i_iter + 1))
 
         # val loss
         # model.eval()
@@ -163,11 +167,8 @@ def main(_run, _config, _log):
         # print loss and take snapshots
         if (i_iter + 1) % _config['print_interval'] == 0:
             avg_loss = log_loss['loss'] / (i_iter + 1)
-            avg_align_loss = log_loss['align_loss'] / (i_iter + 1)
-            if _config['model']['align'] == True: 
-                print(f'step {i_iter+1}: loss: {query_loss}, align_loss: {align_loss}, avg_loss: {avg_loss}, avg_align_loss: {avg_align_loss}')
-            else:
-                print(f'step {i_iter+1}: loss: {query_loss}, avg_loss: {avg_loss}')
+            # avg_align_loss = log_loss['align_loss'] / (i_iter + 1)
+            print(f'step {i_iter+1}: loss: {query_loss}, avg_loss: {avg_loss}')
 
         if (i_iter + 1) % _config['save_pred_every'] == 0:
             _log.info('###### Taking snapshot ######')
@@ -181,11 +182,11 @@ def main(_run, _config, _log):
     import matplotlib.pyplot as plt
     x = [i for i in range(1, len(train_losses)+1)]
     fig = plt.figure(figsize=(38.4,21.6))
-    fig.plot(x, train_losses, label='train loss')
-    fig.plot(x, avg_train_losses, label='average train loss')
+    plt.plot(x, train_losses, label='train loss')
+    plt.plot(x, avg_train_losses, label='average train loss')
     if _config['model']['align'] == True: 
-        fig.plot(x, align_losses, label='align loss') 
-        fig.plot(x, avg_align_losses, label='average align loss')
+        plt.plot(x, align_losses, label='align loss') 
+        plt.plot(x, avg_align_losses, label='average align loss')
     plt.xlabel('iteration')
     plt.ylabel('loss')
     plt.title("training loss")

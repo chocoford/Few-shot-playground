@@ -35,12 +35,12 @@ class FewShotSeg(nn.Module):
             ('backbone', Encoder(in_channels, self.pretrained_path)), ]))
 
         self.cat_layer = nn.Sequential(
-            nn.Conv2d(in_channels=256 * 2, out_channels=256, kernel_size=3, stride=1, padding=2, dilation=2,
+            nn.Conv2d(in_channels=512 * 2, out_channels=2, kernel_size=3, stride=1, padding=2, dilation=2,
                       bias=True),
             nn.ReLU())
 
 
-    def forward(self, supp_imgs, fore_mask, back_mask, qry_imgs):
+    def forward(self, supp_imgs, fore_mask, back_mask, qry_imgs, mode='train'):
         """
         Args
         -------------
@@ -99,31 +99,25 @@ class FewShotSeg(nn.Module):
                 supp_fg_fts, supp_bg_fts)
 
 
-            fg_prototypes = fg_prototypes[0].expand(-1, -1, fts_size[0], fts_size[1])  # tile for cat
+            fg_prototypes = fg_prototypes[0].unsqueeze(-1).unsqueeze(-1).expand(-1, -1, fts_size[0], fts_size[1])  # tile for cat
             out = torch.cat([qry_fts[:, 0], fg_prototypes], dim=1)
 
+            # [N, 2, H', W']
             out = self.cat_layer(out)
 
-            ###### Compute the distance ######
+            # ###### Compute the distance ######
 
-            prototypes = [bg_prototype, ] + fg_prototypes
+            # prototypes = [bg_prototype, ] + fg_prototypes
 
-            dist = [self.calDist(query_fts, prototype)
-                    for prototype in prototypes]
-            pred = torch.stack(dist, dim=1)  # N x (1 + Wa) x H' x W'
+            # dist = [self.calDist(query_fts, prototype)
+            #         for prototype in prototypes]
+            # pred = torch.stack(dist, dim=1)  # N x (1 + Wa) x H' x W'
     
-            outputs.append(F.interpolate(pred, size=img_size, mode='bilinear'))
-            
-                
-            ###### Prototype alignment loss ######
-            if self.config['align'] and self.training:
-                align_loss_epi = self.alignLoss(query_fts, pred, supp_fts[:, :, epi],
-                                                fore_mask[:, :, epi], back_mask[:, :, epi])
-                align_loss += align_loss_epi
+            outputs.append(F.interpolate(out, size=img_size, mode='bilinear'))
 
-        output = torch.stack(outputs, dim=1)  # N x B x (1 + Wa) x H x W
+        output = torch.stack(outputs, dim=1)  # N x B x 2 x H x W
         output = output.view(-1, *output.shape[2:])
-        return output, align_loss / batch_size
+        return output
 
     def calDist(self, fts, prototype, threshold=None, scaler=20):
         """
