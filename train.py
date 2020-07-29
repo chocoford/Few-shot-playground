@@ -181,11 +181,11 @@ def main(_run, _config, _log):
     import matplotlib.pyplot as plt
     x = [i for i in range(1, len(train_losses)+1)]
     fig = plt.figure(figsize=(38.4,21.6))
-    fig.plot(x, train_losses, label='train loss')
-    fig.plot(x, avg_train_losses, label='average train loss')
+    plt.plot(x, train_losses, label='train loss')
+    plt.plot(x, avg_train_losses, label='average train loss')
     if _config['model']['align'] == True: 
-        fig.plot(x, align_losses, label='align loss') 
-        fig.plot(x, avg_align_losses, label='average align loss')
+        plt.plot(x, align_losses, label='align loss') 
+        plt.plot(x, avg_align_losses, label='average align loss')
     plt.xlabel('iteration')
     plt.ylabel('loss')
     plt.title("training loss")
