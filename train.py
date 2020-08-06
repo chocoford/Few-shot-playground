@@ -132,13 +132,26 @@ def main(_run, _config, _log):
         query_pred = model(support_images, support_fg_mask, support_bg_mask,
                                        query_images)
         query_loss = criterion(query_pred, query_labels)
-        loss = query_loss 
+        loss = query_loss #+ 0.001 * entropy_loss(query_pred)
         # with torch.no_grad():
         #     print(f'query_loss: {query_loss}, entropy_loss: {entropy_loss(query_pred)}')
-        #     print(query_pred[0].nonzero().shape)
+        #     print(query_labels[0].nonzero().shape[0])
+        #     print(query_pred[0].nonzero().shape[0])
         loss.backward()
         optimizer.step()
         scheduler.step()
+
+        # query_pred = model(support_images, support_fg_mask, support_bg_mask,
+        #                         query_images) 
+        
+        # loss = entropy_loss(query_pred)
+        # loss.backward()
+        # with torch.no_grad():
+        #     print(f'query_loss: {query_loss}, entropy_loss: {entropy_loss(query_pred)}')
+        #     print(query_labels[0].nonzero().shape[0])
+        #     print(query_pred[0].nonzero().shape[0])
+        # optimizer.step()
+        # scheduler.step()
 
         # Log loss
         query_loss = query_loss.detach().data.cpu().numpy()

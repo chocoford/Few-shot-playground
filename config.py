@@ -37,7 +37,7 @@ def cfg():
 
     if mode == 'train':
         dataset = 'VOC'  # 'VOC' or 'COCO'
-        n_steps = 90000
+        n_steps = 50000
         label_sets = 1
         batch_size = 1
         lr_milestones = [10000, 20000, 30000, 50000]
