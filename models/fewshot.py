@@ -38,6 +38,18 @@ class FewShotSeg(nn.Module):
             nn.Conv2d(in_channels=512 * 2, out_channels=2, kernel_size=3, stride=1, padding=1, dilation=1,
                       bias=True),)
 
+        self.gamma_t = nn.Parameter(torch.zeros(1))
+
+        self.gamma_s = nn.Parameter(torch.zeros(1))
+        self.gamma_q = nn.Parameter(torch.zeros(1))
+
+        self.query_conv = nn.Conv2d(in_channels=512, out_channels=64, kernel_size=1)
+        self.key_conv = nn.Conv2d(in_channels=512, out_channels=64, kernel_size=1)
+        self.value_conv = nn.Conv2d(in_channels=512, out_channels=512, kernel_size=1)
+
+        self.q1_conv = nn.Conv2d(in_channels=512, out_channels=64, kernel_size=1)
+        self.q_shotcut_conv = nn.Conv2d(in_channels=512, out_channels=512, kernel_size=1)
+
 
     def forward(self, supp_imgs, fore_mask, back_mask, qry_imgs, mode='train'):
         """
@@ -72,6 +84,8 @@ class FewShotSeg(nn.Module):
             n_ways, n_shots, batch_size, -1, *fts_size)  # Wa x Sh x B x C x H' x W'
         qry_fts = img_fts[n_ways * n_shots * batch_size:].view(
             n_queries, batch_size, -1, *fts_size)   # N x B x C x H' x W'
+
+        self.augmentFeatureMutually(supp_fts, qry_fts)
 
         fore_mask = torch.stack([torch.stack(way, dim=0)
                                  for way in fore_mask], dim=0)  # Wa x Sh x B x H' x W'
@@ -191,6 +205,26 @@ class FewShotSeg(nn.Module):
         fg_prototypes = [sum(way) / n_shots for way in fg_fts]
         bg_prototype = sum([sum(way) / n_shots for way in bg_fts]) / n_ways
         return fg_prototypes, bg_prototype
+
+
+    def transferGlobally(self, supp_fts, qry_fts):
+        # [B, C, H', W'] i.e. [1, C, H', W']
+        supp_fts = supp_fts[0, 0, :]
+        # [B, C, H', W'] i.e. [1, C, H', W']
+        qry_fts = qry_fts[0]
+
+        _, _, hs, ws = supp_fts.shape
+        _, _, hq, wq = qry_fts.shape
+        
+
+        ###直接把support全局迁移###
+        s_p = torch.sum(supp_fts, dim=(2,3)) / (hs*ws)
+        q_p = torch.sum(qry_fts, dim=(2,3)) / (hq*wq)
+
+        bias = s_p - q_p
+
+        supp_fts = supp_fts - self.gamma_t * bias[..., None, None]
+        return supp_fts.unsqueeze(dim=0).unsqueeze(dim=0)
 
     def augmentFeatureMutually(self, supp_fts, qry_fts):
         """
