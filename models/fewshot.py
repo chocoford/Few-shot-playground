@@ -35,9 +35,8 @@ class FewShotSeg(nn.Module):
             ('backbone', Encoder(in_channels, self.pretrained_path)), ]))
 
         self.cat_layer = nn.Sequential(
-            nn.Conv2d(in_channels=512 * 2, out_channels=2, kernel_size=3, stride=1, padding=2, dilation=2,
-                      bias=True),
-            nn.ReLU())
+            nn.Conv2d(in_channels=512 * 2, out_channels=2, kernel_size=3, stride=1, padding=1, dilation=1,
+                      bias=True),)
 
 
     def forward(self, supp_imgs, fore_mask, back_mask, qry_imgs, mode='train'):
