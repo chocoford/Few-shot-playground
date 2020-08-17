@@ -192,71 +192,91 @@ class FewShotSeg(nn.Module):
         bg_prototype = sum([sum(way) / n_shots for way in bg_fts]) / n_ways
         return fg_prototypes, bg_prototype
 
-    def alignLoss(self, qry_fts, pred, supp_fts, fore_mask, back_mask):
+    def augmentFeatureMutually(self, supp_fts, qry_fts):
         """
-        Compute the loss for the prototype alignment branch
+            Transfer Features
+            2020年6月28日，目前只handle 1 way 1 shot的情况
 
-        Args:
-            qry_fts: embedding features for query images
-                expect shape: N x C x H' x W' or N x C x H x W if us_first
-            pred: predicted segmentation score，其中pred[:, 0]是背景
-                expect shape: N x (1 + Wa) x H x W
-            supp_fts: embedding fatures for support images
-                expect shape: Wa x Sh x C x H' x W'
-            fore_mask: foreground masks for support images
-                expect shape: way x shot x H x W
-            back_mask: background masks for support images
-                expect shape: way x shot x H x W
+
         """
-        n_ways, n_shots = len(fore_mask), len(fore_mask[0])
+        # [B, C, H', W'] i.e. [1, C, H', W']
+        supp_fts = supp_fts[0, 0, :]
+        # [B, C, H', W'] i.e. [1, C, H', W']
+        qry_fts = qry_fts[0]
 
-        # Mask and get query prototype
-        # N x 1 x H' x W' 在每个像素的层面上判断这个像素最可能是哪个类
-        pred_mask = pred.argmax(dim=1, keepdim=True)
-        # binary_masks是一个list，包含(1 + n_ways)个tensor，每个tensor表示每个像素是否属于该类。
-        binary_masks = [pred_mask == i for i in range(1 + n_ways)]
-        skip_ways = [i for i in range(
-            n_ways) if binary_masks[i + 1].sum() == 0]
-        # N x (1 + Wa) x 1 x H' x W'
-        pred_mask = torch.stack(binary_masks, dim=1).float()
-        qry_prototypes = torch.sum(
-            qry_fts.unsqueeze(1) * pred_mask, dim=(0, 3, 4))
-        qry_prototypes = qry_prototypes / \
-            (pred_mask.sum((0, 3, 4)) + 1e-5)  # (1 + Wa) x C
+        # [B, C, H', W'] i.e. [1, C, H', W']
+        s_fts = F.relu(supp_fts)
+        # [B, C, H', W'] i.e. [1, C, H', W']
+        q_fts = F.relu(qry_fts)
 
-        # Compute the support loss
-        loss = 0
-        for way in range(n_ways):
-            if way in skip_ways:
-                continue
-            # Get the query prototypes
-            if self.config['no_pbg']:
-                prototypes = [qry_prototypes[[way + 1]]]
-            else:
-                prototypes = [qry_prototypes[[0]], qry_prototypes[[way + 1]]] #[[0]]相当于增加了一个维度
-            for shot in range(n_shots):
-                img_fts = supp_fts[way, [shot]]
-                if self.config['us_first']:
-                    img_fts = F.interpolate(img_fts, size=fore_mask.shape[-2:], mode='bilinear')
-                    if self.config['no_pbg']:
-                        supp_dist = [self.calDist(img_fts, prototype, threshold=0.5)
-                                    for prototype in prototypes]
-                    else: 
-                        supp_dist = [self.calDist(img_fts, prototype)
-                                    for prototype in prototypes]
-                    supp_pred = torch.stack(supp_dist, dim=1)
-                else:
-                    supp_dist = [self.calDist(img_fts, prototype)
-                                for prototype in prototypes]
-                    supp_pred = torch.stack(supp_dist, dim=1)
-                    supp_pred = F.interpolate(supp_pred, size=fore_mask.shape[-2:],
-                                            mode='bilinear')
-                # Construct the support Ground-Truth segmentation
-                supp_label = torch.full_like(fore_mask[way, shot], 255,
-                                             device=img_fts.device).long()
-                supp_label[fore_mask[way, shot] == 1] = 1
-                supp_label[back_mask[way, shot] == 1] = 0
-                # Compute Loss
-                loss = loss + F.cross_entropy(
-                    supp_pred, supp_label[None, ...], ignore_index=255) / n_shots / n_ways
-        return loss
+        _, c, h, w = s_fts.shape
+
+        s_query = self.query_conv(s_fts)
+        q_query = self.query_conv(q_fts)
+        s_key = self.key_conv(s_fts)
+        q_key = self.key_conv(q_fts)
+        # s_query = s_fts
+        # q_query = q_fts
+        # s_key = s_fts
+        # q_key = q_fts
+
+        ######归一化#####
+        def emb_normalize(emb):
+            _, _, h, w = emb.shape
+            buffer = torch.pow(emb, 2)
+            norm = torch.sqrt(torch.sum(buffer, 1).add_(1e-10))
+
+            return torch.div(emb, norm.view(-1, 1, h, w).expand_as(emb))
+
+        s_query = emb_normalize(s_query)
+        q_query = emb_normalize(q_query)
+        s_key = emb_normalize(s_key)
+        q_key = emb_normalize(q_key)
+        ####结束归一化###
+
+
+        # [1, C, H' x W']
+        s_key = s_key.view(1, -1, h*w)
+        q_key = q_key.view(1, -1, h*w)
+        # [1, H' x W', C]
+        s_query = s_query.view(1, -1, h*w).permute(0, 2, 1)
+        q_query = q_query.view(1, -1, h*w).permute(0, 2, 1)
+        # [1, H' x W', H' x W']
+        s2q_similarity_map = F.softmax(torch.bmm(s_query, q_key), dim=1)
+        q2s_similarity_map = F.softmax(torch.bmm(q_query, s_key), dim=1)
+
+        #########可视化相似图###########
+        # save_image(qry_imgs[0][0], name=f'qry_img', normalize=True)
+        # for i, m in enumerate(s2q_similarity_map[0]):
+        #     result = m.view(h, w)
+        #     if i < 2:
+        #         print(result)
+        #         print(result.max())
+        #     save_image(result, name=f'result_{i%w}_{int(i/w)}')
+        # exit()
+        ##########结束end###########
+
+        # similarity_map = torch.stack([F.cosine_similarity(s1[..., i][..., None], q, dim=0)
+        #                   for i in range(h*w)])
+        # [H' x W', C]
+        # s2 = torch.stack([torch.sum(q * similarity_map[i, :], dim=1) for i in range(h*w)])
+        
+        # [1, C, H' x W']
+        s_value = self.value_conv(s_fts).view(1, -1, h*w)
+        q_value = self.value_conv(q_fts).view(1, -1, h*w)
+        # [1, C, H' x W']
+        s = torch.bmm(q_value, s2q_similarity_map.permute(0, 2, 1))
+        q = torch.bmm(s_value, q2s_similarity_map.permute(0, 2, 1))
+        # [C, H', W']
+        # s2 = s2.view(h, w, c).permute(2, 0, 1) / (h*w)
+        s = s.view(1, -1, h, w)
+        q = q.view(1, -1, h, w)
+        # print(f's2\'s shape: {s2.shape}')
+        s = self.gamma_s * s + supp_fts
+        q = self.gamma_q * q + qry_fts
+        supp_fts = s.unsqueeze(dim=0).unsqueeze(dim=0)
+        qry_fts = q.unsqueeze(dim=0)
+        if self.gpu_tracker:
+            self.gpu_tracker.track()
+        ###### End Transfer Features ######
+        return supp_fts, qry_fts
