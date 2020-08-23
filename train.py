@@ -2,9 +2,11 @@
 """Training Script"""
 import os
 import shutil
+import numpy as np
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import MultiStepLR
@@ -12,19 +14,23 @@ import torch.backends.cudnn as cudnn
 from torchvision.transforms import Compose
 
 from models.fewshot import FewShotSeg
-from models.resnet import resnet
 from dataloaders.customized import voc_fewshot, coco_fewshot
 from dataloaders.transforms import RandomMirror, Resize, ToTensorNormalize
 from util.utils import set_seed, CLASS_LABELS
 from util.loss import entropy_loss
+from util.metric import Metric
 from config import ex
+from util.gpu_mem_track import MemTracker
+import inspect
 
-  
 @ex.automain
 def main(_run, _config, _log):
     """
     从15个训练类里随机抽取一个类，然后抽取两张图片分别作为support和query
     """
+    frame = inspect.currentframe()
+    gpu_tracker = MemTracker(frame, path=_run.observers[0].dir+'/')
+
     if _run.observers:
         os.makedirs(f'{_run.observers[0].dir}/snapshots', exist_ok=True)
         for source_file, _ in _run.experiment_info['sources']:
@@ -111,6 +117,7 @@ def main(_run, _config, _log):
     avg_train_losses = []
     avg_align_losses = []
     val_losses = []
+
     _log.info('###### Training ######')
     for i_iter, sample_batched in enumerate(train_dl):
         model.train()
@@ -126,24 +133,41 @@ def main(_run, _config, _log):
                         for query_image in sample_batched['query_images']]
         query_labels = torch.cat(
             [query_label.long().cuda() for query_label in sample_batched['query_labels']], dim=0)
+        # query_labels = torch.cat(
+        #     [((query_label + 255) % 255).float().cuda() for query_label in sample_batched['query_labels']], dim=0)
 
         # Forward and Backward
         optimizer.zero_grad()
+
+        # entropy loss
+        # support_label = [[shot[f'fg_mask'].long().cuda() for shot in way]
+        #             for way in sample_batched['support_mask']]
+        # support_pred = model(support_images, support_fg_mask, support_bg_mask,
+        #                         support_images[0], gpu_tracker, mutual_enhancement=False)
+        # ent_loss = entropy_loss(support_pred)
+        # support_loss = criterion(support_pred, torch.cat(support_label[0], dim=0))
+        # loss = support_loss #+ 0.001 * ent_loss
+        # loss.backward()
+        # end
+
         query_pred = model(support_images, support_fg_mask, support_bg_mask,
-                                       query_images)
+                           query_images, gpu_tracker)
+        # query_pred = query_pred[0]
         query_loss = criterion(query_pred, query_labels)
-        loss = query_loss #+ 0.001 * entropy_loss(query_pred)
+        loss = query_loss# + 0.001 * entropy_loss(F.softmax(query_pred, dim=0))
         # with torch.no_grad():
-        #     print(f'query_loss: {query_loss}, entropy_loss: {entropy_loss(query_pred)}')
-        #     print(query_labels[0].nonzero().shape[0])
-        #     print(query_pred[0].nonzero().shape[0])
+        #     # if query_loss > 1: 
+
+        #     # print(f'query_loss: {query_loss}, entropy_loss: {entropy_loss(F.softmax(query_pred))}')
+        #     print(f'query_loss: {query_loss}')
+        #     # print(query_labels[0].nonzero().shape[0])
+        #     # print(query_pred[0].nonzero().shape[0])
         loss.backward()
         optimizer.step()
         scheduler.step()
-
         # query_pred = model(support_images, support_fg_mask, support_bg_mask,
-        #                         query_images) 
-        
+        #                         query_images)
+
         # loss = entropy_loss(query_pred)
         # loss.backward()
         # with torch.no_grad():
@@ -160,9 +184,9 @@ def main(_run, _config, _log):
         # _run.log_scalar('align_loss', align_loss)
         log_loss['loss'] += query_loss
         # log_loss['align_loss'] += align_loss
-        train_losses.append(query_loss)
+        # train_losses.append(query_loss)
         # align_losses.append(align_loss)
-        avg_train_losses.append(log_loss['loss'] / (i_iter + 1))
+        # avg_train_losses.append(log_loss['loss'] / (i_iter + 1))
         # avg_align_losses.append(log_loss['align_loss'] / (i_iter + 1))
 
         # val loss
@@ -181,6 +205,8 @@ def main(_run, _config, _log):
         if (i_iter + 1) % _config['print_interval'] == 0:
             avg_loss = log_loss['loss'] / (i_iter + 1)
             # avg_align_loss = log_loss['align_loss'] / (i_iter + 1)
+            train_losses.append(query_loss)
+            avg_train_losses.append(log_loss['loss'] / (i_iter + 1))
             print(f'step {i_iter+1}: loss: {query_loss}, avg_loss: {avg_loss}')
 
         if (i_iter + 1) % _config['save_pred_every'] == 0:
@@ -188,19 +214,20 @@ def main(_run, _config, _log):
             torch.save(model.state_dict(),
                        os.path.join(f'{_run.observers[0].dir}/snapshots', f'{i_iter + 1}.pth'))
 
+
     _log.info('###### Saving final model ######')
     torch.save(model.state_dict(),
                os.path.join(f'{_run.observers[0].dir}/snapshots', f'{i_iter + 1}.pth'))
-    
+
     import matplotlib.pyplot as plt
     x = [i for i in range(1, len(train_losses)+1)]
-    fig = plt.figure(figsize=(38.4,21.6))
+    fig = plt.figure(figsize=(19.2, 10.8))
     plt.plot(x, train_losses, label='train loss')
     plt.plot(x, avg_train_losses, label='average train loss')
-    if _config['model']['align'] == True: 
-        plt.plot(x, align_losses, label='align loss') 
+    if _config['model']['align'] == True:
+        plt.plot(x, align_losses, label='align loss')
         plt.plot(x, avg_align_losses, label='average align loss')
-    plt.xlabel('iteration')
+    plt.xlabel('iteration (hundreds)')
     plt.ylabel('loss')
     plt.title("training loss")
     plt.legend()

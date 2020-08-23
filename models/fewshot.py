@@ -9,7 +9,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .vgg import Encoder
-from .resnet import resnet
+from .resnet import resnet18, resnet50
 
 
 class FewShotSeg(nn.Module):
@@ -25,33 +25,57 @@ class FewShotSeg(nn.Module):
             model configurations
     """
 
-    def __init__(self, in_channels=3, pretrained_path=None, cfg=None, encoder="vgg"):
+    def __init__(self, in_channels=3, pretrained_path=None, cfg=None, encoder="vgg", gpu_tracker=None):
         super().__init__()
         self.pretrained_path = pretrained_path
         self.config = cfg or {'align': False}
 
+        self.gpu_tracker = gpu_tracker
+
+        self.cat_layer = nn.Sequential(
+            nn.Conv2d(in_channels=512 * 2, out_channels=512, kernel_size=1, stride=1, padding=1, dilation=1,
+                      bias=True),)
+
+        # 新加的
+        self.rcu_1 = nn.Sequential(
+            nn.ReLU(),
+            nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1, bias=True),
+            nn.ReLU(),
+            nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1, bias=True)
+        )
+        self.layer_final = nn.Conv2d(
+            512, 1, kernel_size=1, stride=1, bias=True)
+
+        self.query_conv = nn.Conv2d(
+            in_channels=512, out_channels=256, kernel_size=1)
+        self.key_conv = nn.Conv2d(
+            in_channels=512, out_channels=256, kernel_size=1)
+        self.value_conv = nn.Conv2d(
+            in_channels=512, out_channels=256, kernel_size=1)
+        self.de_conv = nn.Conv2d(
+            in_channels=256, out_channels=512, kernel_size=1)
+        # self.q_shotcut_conv = nn.Conv2d(in_channels=512, out_channels=512, kernel_size=1)
+
+        # 为新加的层初始化权重
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+                m.weight.data.normal_(0, 0.01)
+                # print('Conv2d', m)
+            elif isinstance(m, nn.BatchNorm2d):
+                m.weight.data.fill_(1)
+                m.bias.data.zero_()
+                print('nn.BatchNorm2d: ', m)
+
         # Encoder: VGG-16
         self.encoder = nn.Sequential(OrderedDict([
             ('backbone', Encoder(in_channels, self.pretrained_path)), ]))
+        # self.encoder = nn.Sequential(OrderedDict([
+        #     ('backbone', resnet50(True))]))
 
-        self.cat_layer = nn.Sequential(
-            nn.Conv2d(in_channels=512 * 2, out_channels=2, kernel_size=3, stride=1, padding=1, dilation=1,
-                      bias=True),)
+        # exit()
 
-        self.gamma_t = nn.Parameter(torch.zeros(1))
-
-        self.gamma_s = nn.Parameter(torch.zeros(1))
-        self.gamma_q = nn.Parameter(torch.zeros(1))
-
-        self.query_conv = nn.Conv2d(in_channels=512, out_channels=64, kernel_size=1)
-        self.key_conv = nn.Conv2d(in_channels=512, out_channels=64, kernel_size=1)
-        self.value_conv = nn.Conv2d(in_channels=512, out_channels=512, kernel_size=1)
-
-        self.q1_conv = nn.Conv2d(in_channels=512, out_channels=64, kernel_size=1)
-        self.q_shotcut_conv = nn.Conv2d(in_channels=512, out_channels=512, kernel_size=1)
-
-
-    def forward(self, supp_imgs, fore_mask, back_mask, qry_imgs, mode='train'):
+    def forward(self, supp_imgs, fore_mask, back_mask, qry_imgs, mode='train', mutual_enhancement=True):
         """
         Args
         -------------
@@ -85,7 +109,8 @@ class FewShotSeg(nn.Module):
         qry_fts = img_fts[n_ways * n_shots * batch_size:].view(
             n_queries, batch_size, -1, *fts_size)   # N x B x C x H' x W'
 
-        self.augmentFeatureMutually(supp_fts, qry_fts)
+        if mutual_enhancement == True:
+            self.augmentFeatureMutually(supp_fts, qry_fts)
 
         fore_mask = torch.stack([torch.stack(way, dim=0)
                                  for way in fore_mask], dim=0)  # Wa x Sh x B x H' x W'
@@ -93,7 +118,6 @@ class FewShotSeg(nn.Module):
                                  for way in back_mask], dim=0)  # Wa x Sh x B x H' x W'
 
         ###### Compute loss ######
-        align_loss = 0
         outputs = []
         for epi in range(batch_size):
             query_fts = qry_fts[:, epi]
@@ -111,22 +135,37 @@ class FewShotSeg(nn.Module):
             fg_prototypes, bg_prototype = self.getPrototype(
                 supp_fg_fts, supp_bg_fts)
 
+            prototypes = [bg_prototype, ] + fg_prototypes
 
-            fg_prototypes = fg_prototypes[0].unsqueeze(-1).unsqueeze(-1).expand(-1, -1, fts_size[0], fts_size[1])  # tile for cat
-            out = torch.cat([qry_fts[:, 0], fg_prototypes], dim=1)
+            bg_prototype = bg_prototype.unsqueeze(
+                -1).unsqueeze(-1).expand(-1, -1, fts_size[0], fts_size[1])  # tile for cat
+            fg_prototype = fg_prototypes[0].unsqueeze(
+                -1).unsqueeze(-1).expand(-1, -1, fts_size[0], fts_size[1])  # tile for cat
 
-            # [N, 2, H', W']
-            out = self.cat_layer(out)
+            fg_out = torch.cat([qry_fts[:, 0], fg_prototype], dim=1)
+            # [N, C, H', W']
+            fg_out = self.cat_layer(fg_out)
+            fg_out = self.rcu_1(fg_out)
+            # [N, 1, H', W']
+            fg_out = self.layer_final(fg_out)
+            pred = fg_out
 
+            # bg_out = torch.cat([qry_fts[:, 0], bg_prototype], dim=1)
+            # # [N, C, H', W']
+            # bg_out = self.cat_layer(bg_out)
+            # bg_out = self.rcu_1(bg_out)
+            # # [N, 1, H', W']
+            # bg_out = self.layer_final(bg_out)
+
+            # pred = torch.cat([bg_out, fg_out], dim=1)
             # ###### Compute the distance ######
 
-            # prototypes = [bg_prototype, ] + fg_prototypes
-
-            # dist = [self.calDist(query_fts, prototype)
-            #         for prototype in prototypes]
+            # qry_fts_s = [bg_out, fg_out]
+            # dist = [self.calDist(qry_fts, prototype)
+            #         for qry_fts, prototype in zip(qry_fts_s, prototypes)]
             # pred = torch.stack(dist, dim=1)  # N x (1 + Wa) x H' x W'
-    
-            outputs.append(F.interpolate(out, size=img_size, mode='bilinear'))
+
+            outputs.append(F.interpolate(pred, size=img_size, mode='bilinear'))
 
         output = torch.stack(outputs, dim=1)  # N x B x 2 x H x W
         output = output.view(-1, *output.shape[2:])
@@ -155,7 +194,6 @@ class FewShotSeg(nn.Module):
             dist = torch.where(dist > 0.5, dist, zeros)
         return dist
 
-
     def getFeatures(self, fts, mask):
         """
         Extract foreground and background features via masked average pooling
@@ -167,22 +205,8 @@ class FewShotSeg(nn.Module):
         fts = F.interpolate(
             fts, size=mask.shape[-2:], mode='bilinear')  # 采样到与mask一样的大小
 
-        # playground
-        if self.config['cwa']:
-            valid_fts = fts * mask[None, ...]
-            ones = torch.ones_like(valid_fts)
-            zeros = torch.zeros_like(valid_fts)
-            masked_fts = torch.sum(valid_fts, dim=(2, 3)) \
-            / (mask[None, ...].sum(dim=(2, 3)).repeat(fts.shape[:2]) \
-            + torch.where(valid_fts > 0, ones, zeros).sum(dim=(2,3)) + 1e-5)
-        elif self.config['cwwa']: 
-            masked_fts = torch.sum(fts * mask[None, ...], dim=(2, 3)) \
-            / (mask[None, ...].sum(dim=(2, 3)) + 1e-5)
-        
-        # 把整个输入变成一个向量
-        else:
-            masked_fts = torch.sum(fts * mask[None, ...], dim=(2, 3)) \
-                / (mask[None, ...].sum(dim=(2, 3)) + 1e-5)  # 1 x C
+        masked_fts = torch.sum(fts * mask[None, ...], dim=(2, 3)) \
+            / (mask[None, ...].sum(dim=(2, 3)) + 1e-5)  # 1 x C
         return masked_fts
 
     def getPrototype(self, fg_fts, bg_fts):
@@ -206,7 +230,6 @@ class FewShotSeg(nn.Module):
         bg_prototype = sum([sum(way) / n_shots for way in bg_fts]) / n_ways
         return fg_prototypes, bg_prototype
 
-
     def transferGlobally(self, supp_fts, qry_fts):
         # [B, C, H', W'] i.e. [1, C, H', W']
         supp_fts = supp_fts[0, 0, :]
@@ -215,11 +238,10 @@ class FewShotSeg(nn.Module):
 
         _, _, hs, ws = supp_fts.shape
         _, _, hq, wq = qry_fts.shape
-        
 
         ###直接把support全局迁移###
-        s_p = torch.sum(supp_fts, dim=(2,3)) / (hs*ws)
-        q_p = torch.sum(qry_fts, dim=(2,3)) / (hq*wq)
+        s_p = torch.sum(supp_fts, dim=(2, 3)) / (hs*ws)
+        q_p = torch.sum(qry_fts, dim=(2, 3)) / (hq*wq)
 
         bias = s_p - q_p
 
@@ -268,7 +290,6 @@ class FewShotSeg(nn.Module):
         q_key = emb_normalize(q_key)
         ####结束归一化###
 
-
         # [1, C, H' x W']
         s_key = s_key.view(1, -1, h*w)
         q_key = q_key.view(1, -1, h*w)
@@ -294,7 +315,7 @@ class FewShotSeg(nn.Module):
         #                   for i in range(h*w)])
         # [H' x W', C]
         # s2 = torch.stack([torch.sum(q * similarity_map[i, :], dim=1) for i in range(h*w)])
-        
+
         # [1, C, H' x W']
         s_value = self.value_conv(s_fts).view(1, -1, h*w)
         q_value = self.value_conv(q_fts).view(1, -1, h*w)
@@ -303,11 +324,11 @@ class FewShotSeg(nn.Module):
         q = torch.bmm(s_value, q2s_similarity_map.permute(0, 2, 1))
         # [C, H', W']
         # s2 = s2.view(h, w, c).permute(2, 0, 1) / (h*w)
-        s = s.view(1, -1, h, w)
-        q = q.view(1, -1, h, w)
+        s = self.de_conv(s.view(1, -1, h, w))  # s.view(1, -1, h, w)
+        q = self.de_conv(q.view(1, -1, h, w))  # q.view(1, -1, h, w)
         # print(f's2\'s shape: {s2.shape}')
-        s = self.gamma_s * s + supp_fts
-        q = self.gamma_q * q + qry_fts
+        s = s + supp_fts
+        q = q + qry_fts
         supp_fts = s.unsqueeze(dim=0).unsqueeze(dim=0)
         qry_fts = q.unsqueeze(dim=0)
         if self.gpu_tracker:

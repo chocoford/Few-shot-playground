@@ -134,6 +134,13 @@ def main(_run, _config, _log):
                 metric.record(np.array(query_pred.argmax(dim=1)[0].cpu()),
                               np.array(query_labels[0].cpu()),
                               labels=label_ids, n_run=run)
+                
+                #for exp 9
+                # query_pred = query_pred[0].cpu()
+                # query_pred = torch.where(query_pred > 0.5, torch.ones(1), torch.zeros(1))
+                # metric.record(np.array(query_pred[0]),
+                #               np.array(query_labels[0].cpu()),
+                #               labels=label_ids, n_run=run)
 
             classIoU, meanIoU = metric.get_mIoU(labels=sorted(labels), n_run=run)
             classIoU_binary, meanIoU_binary = metric.get_mIoU_binary(n_run=run)
