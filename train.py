@@ -23,6 +23,9 @@ from config import ex
 from util.gpu_mem_track import MemTracker
 import inspect
 
+import matplotlib.pyplot as plt
+
+
 @ex.automain
 def main(_run, _config, _log):
     """
@@ -117,6 +120,8 @@ def main(_run, _config, _log):
     avg_train_losses = []
     avg_align_losses = []
     val_losses = []
+    m_iou = []
+    metric = Metric(max_label=20, n_runs=1)
 
     _log.info('###### Training ######')
     for i_iter, sample_batched in enumerate(train_dl):
@@ -139,24 +144,27 @@ def main(_run, _config, _log):
         # Forward and Backward
         optimizer.zero_grad()
 
-        # entropy loss
-        # support_label = [[shot[f'fg_mask'].long().cuda() for shot in way]
-        #             for way in sample_batched['support_mask']]
-        # support_pred = model(support_images, support_fg_mask, support_bg_mask,
-        #                         support_images[0], gpu_tracker, mutual_enhancement=False)
+        # # entropy loss
+        support_label = [[shot[f'fg_mask'].long().cuda() for shot in way]
+                    for way in sample_batched['support_mask']]
+        support_label = torch.cat(support_label[0], dim=0)
+        support_pred = model(support_images, support_fg_mask, support_bg_mask,
+                                support_images[0], gpu_tracker, mutual_enhancement=True)
         # ent_loss = entropy_loss(support_pred)
-        # support_loss = criterion(support_pred, torch.cat(support_label[0], dim=0))
-        # loss = support_loss #+ 0.001 * ent_loss
-        # loss.backward()
+        support_loss = criterion(support_pred, support_label)
+        # query_loss = support_loss
+        loss = support_loss #+ 0.001 * ent_loss
+        loss.backward()
         # end
 
         query_pred = model(support_images, support_fg_mask, support_bg_mask,
                            query_images, gpu_tracker)
         # query_pred = query_pred[0]
         query_loss = criterion(query_pred, query_labels)
-        loss = query_loss# + 0.001 * entropy_loss(F.softmax(query_pred, dim=0))
+        # + 0.001 * entropy_loss(F.softmax(query_pred, dim=0))
+        loss = query_loss
         # with torch.no_grad():
-        #     # if query_loss > 1: 
+        #     # if query_loss > 1:
 
         #     # print(f'query_loss: {query_loss}, entropy_loss: {entropy_loss(F.softmax(query_pred))}')
         #     print(f'query_loss: {query_loss}')
@@ -189,6 +197,10 @@ def main(_run, _config, _log):
         # avg_train_losses.append(log_loss['loss'] / (i_iter + 1))
         # avg_align_losses.append(log_loss['align_loss'] / (i_iter + 1))
 
+        iou = metric.record(np.array(query_pred.argmax(dim=1)[0].cpu()),
+                            np.array(query_labels[0].cpu()),
+                            labels=list(sample_batched['class_ids']), n_run=0)
+
         # val loss
         # model.eval()
         # with torch.no_grad():
@@ -207,28 +219,33 @@ def main(_run, _config, _log):
             # avg_align_loss = log_loss['align_loss'] / (i_iter + 1)
             train_losses.append(query_loss)
             avg_train_losses.append(log_loss['loss'] / (i_iter + 1))
-            print(f'step {i_iter+1}: loss: {query_loss}, avg_loss: {avg_loss}')
+
+            _, _, meanIoU, _ = metric.get_mIoU(labels=sorted(labels))
+            print(
+                f'step {i_iter+1}: loss: {query_loss}, avg_loss: {avg_loss}, m_iou: {meanIoU}')
+
+            m_iou.append(meanIoU)
+
+            # save the loss pic
+            x = [i for i in range(1, len(avg_train_losses)+1)]
+            fig = plt.figure(figsize=(19.2, 10.8))
+            plt.plot(x, m_iou, label='mean iou')
+            plt.plot(x, avg_train_losses, label='average train loss')
+            if _config['model']['align'] == True:
+                plt.plot(x, align_losses, label='align loss')
+                plt.plot(x, avg_align_losses, label='average align loss')
+            plt.xlabel('iteration (hundreds)')
+            plt.ylabel('loss')
+            plt.title("training loss")
+            plt.legend()
+            plt.savefig(f'{_run.observers[0].dir}/loss.png')
+            plt.close()
 
         if (i_iter + 1) % _config['save_pred_every'] == 0:
             _log.info('###### Taking snapshot ######')
             torch.save(model.state_dict(),
                        os.path.join(f'{_run.observers[0].dir}/snapshots', f'{i_iter + 1}.pth'))
 
-
     _log.info('###### Saving final model ######')
     torch.save(model.state_dict(),
                os.path.join(f'{_run.observers[0].dir}/snapshots', f'{i_iter + 1}.pth'))
-
-    import matplotlib.pyplot as plt
-    x = [i for i in range(1, len(train_losses)+1)]
-    fig = plt.figure(figsize=(19.2, 10.8))
-    plt.plot(x, train_losses, label='train loss')
-    plt.plot(x, avg_train_losses, label='average train loss')
-    if _config['model']['align'] == True:
-        plt.plot(x, align_losses, label='align loss')
-        plt.plot(x, avg_align_losses, label='average align loss')
-    plt.xlabel('iteration (hundreds)')
-    plt.ylabel('loss')
-    plt.title("training loss")
-    plt.legend()
-    plt.savefig(f'{_run.observers[0].dir}/loss.png')

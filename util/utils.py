@@ -4,6 +4,7 @@ import random
 import torch
 import numpy as np
 
+
 def set_seed(seed):
     """
     Set the random seed
@@ -11,6 +12,7 @@ def set_seed(seed):
     random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
+
 
 CLASS_LABELS = {
     'VOC': {
@@ -28,6 +30,7 @@ CLASS_LABELS = {
         3: set(range(1, 81)) - set(range(61, 81)),
     }
 }
+
 
 def get_bbox(fg_mask, inst_mask):
     """
@@ -57,3 +60,4 @@ def get_bbox(fg_mask, inst_mask):
         x_max = min(mask_idx[1].max(), fg_mask.shape[2] - 1)
         bg_bbox[0, y_min:y_max+1, x_min:x_max+1] = 0
     return fg_bbox, bg_bbox
+

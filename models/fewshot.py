@@ -43,17 +43,25 @@ class FewShotSeg(nn.Module):
             nn.ReLU(),
             nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1, bias=True)
         )
+        self.rcu_2 = nn.Sequential(
+            nn.ReLU(),
+            nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1, bias=True),
+            nn.ReLU(),
+            nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1, bias=True)
+        )
         self.layer_final = nn.Conv2d(
-            512, 1, kernel_size=1, stride=1, bias=True)
+            512, 2, kernel_size=1, stride=1, bias=True)
+
+        self.attention_channels = 256
 
         self.query_conv = nn.Conv2d(
-            in_channels=512, out_channels=256, kernel_size=1)
+            in_channels=512, out_channels=self.attention_channels, kernel_size=1)
         self.key_conv = nn.Conv2d(
-            in_channels=512, out_channels=256, kernel_size=1)
+            in_channels=512, out_channels=self.attention_channels, kernel_size=1)
         self.value_conv = nn.Conv2d(
-            in_channels=512, out_channels=256, kernel_size=1)
+            in_channels=512, out_channels=self.attention_channels, kernel_size=1)
         self.de_conv = nn.Conv2d(
-            in_channels=256, out_channels=512, kernel_size=1)
+            in_channels=self.attention_channels, out_channels=512, kernel_size=1)
         # self.q_shotcut_conv = nn.Conv2d(in_channels=512, out_channels=512, kernel_size=1)
 
         # 为新加的层初始化权重
@@ -146,6 +154,7 @@ class FewShotSeg(nn.Module):
             # [N, C, H', W']
             fg_out = self.cat_layer(fg_out)
             fg_out = self.rcu_1(fg_out)
+            fg_out = self.rcu_2(fg_out) + fg_out
             # [N, 1, H', W']
             fg_out = self.layer_final(fg_out)
             pred = fg_out
@@ -165,7 +174,7 @@ class FewShotSeg(nn.Module):
             #         for qry_fts, prototype in zip(qry_fts_s, prototypes)]
             # pred = torch.stack(dist, dim=1)  # N x (1 + Wa) x H' x W'
 
-            outputs.append(F.interpolate(pred, size=img_size, mode='bilinear'))
+            outputs.append(F.interpolate(pred, size=img_size, mode='bilinear', align_corners=True))
 
         output = torch.stack(outputs, dim=1)  # N x B x 2 x H x W
         output = output.view(-1, *output.shape[2:])
@@ -203,7 +212,7 @@ class FewShotSeg(nn.Module):
             mask: binary mask, expect shape: 1 x H x W
         """
         fts = F.interpolate(
-            fts, size=mask.shape[-2:], mode='bilinear')  # 采样到与mask一样的大小
+            fts, size=mask.shape[-2:], mode='bilinear', align_corners=True)  # 采样到与mask一样的大小
 
         masked_fts = torch.sum(fts * mask[None, ...], dim=(2, 3)) \
             / (mask[None, ...].sum(dim=(2, 3)) + 1e-5)  # 1 x C
@@ -297,8 +306,8 @@ class FewShotSeg(nn.Module):
         s_query = s_query.view(1, -1, h*w).permute(0, 2, 1)
         q_query = q_query.view(1, -1, h*w).permute(0, 2, 1)
         # [1, H' x W', H' x W']
-        s2q_similarity_map = F.softmax(torch.bmm(s_query, q_key), dim=1)
-        q2s_similarity_map = F.softmax(torch.bmm(q_query, s_key), dim=1)
+        s2q_similarity_map = torch.bmm(s_query, q_key)
+        q2s_similarity_map = torch.bmm(q_query, s_key)
 
         #########可视化相似图###########
         # save_image(qry_imgs[0][0], name=f'qry_img', normalize=True)
